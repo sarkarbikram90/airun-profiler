@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: airun-gpu-agent
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: airun-gpu-agent
+    app.kubernetes.io/part-of: airun-ai-infrastructure
+    app.kubernetes.io/component: telemetry-collector
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: airun-gpu-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: airun-gpu-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9445"
+        prometheus.io/path: "/metrics"
+    spec:
+      hostPID: true
+      hostIPC: true
+      # Tolerate NVIDIA GPU node taints so agent schedules on high-value AI accelerator nodes
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "cloud.google.com/gke-accelerator"
+          operator: "Exists"
+          effect: "NoSchedule"
+      # Target GKE GPU Node Pools (e.g. H100, A100, L4, Blackwell)
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "cloud.google.com/gke-accelerator"
+                    operator: "Exists"
+              - matchExpressions:
+                  - key: "nvidia.com/gpu.present"
+                    operator: "In"
+                    values: ["true"]
+      priorityClassName: system-node-critical
+      serviceAccountName: airun-agent-sa
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: airun-collector
+          image: ghcr.io/sarkarbikram90/airun-agent:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - "/usr/local/bin/airun-agent"
+            - "--dcgm-endpoint=unix:///var/run/nvidia-dcgm/dcgm.sock"
+            - "--sampling-rate-hz=1"
+            - "--pubsub-topic=ai-infrastructure-events"
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_PTRACE
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: GCP_PROJECT_ID
+              value: "airun-production"
+            - name: AIRUN_ENABLE_MFU_PROFILING
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          ports:
+            - name: telemetry
+              containerPort: 9445
+              protocol: TCP
+          volumeMounts:
+            - name: dcgm-socket
+              mountPath: /var/run/nvidia-dcgm
+              readOnly: true
+            - name: sysfs
+              mountPath: /sys
+              readOnly: true
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+      volumes:
+        - name: dcgm-socket
+          hostPath:
+            path: /var/run/nvidia-dcgm
+            type: DirectoryOrCreate
+        - name: sysfs
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: proc
+          hostPath:
+            path: /proc
+            type: Directory

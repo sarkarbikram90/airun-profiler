@@ -8,10 +8,12 @@ import json
 import urllib.parse
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 from airun.analysis.analyzer import analyze_spans
 from airun.analysis.comparator import compare_traces
+from airun.analysis.waste import detect_compute_waste
 from airun.incident.graph import build_sample_incident_graph
 from airun.resilience.breaker import get_resilience_manager
 from airun.resilience.dr_drills import run_disaster_recovery_drill
@@ -259,6 +261,122 @@ class AirunServerHandler(BaseHTTPRequestHandler):
             sum2 = rec2.summary or analyze_spans(rec2.spans)
             comparison = compare_traces(sum1, sum2)
             self._send_json(comparison.model_dump())
+            return
+
+        # API: Physics of AI Waste & Financial Bleed
+        if path == "/api/waste":
+            accel = query_params.get("accelerator", ["h100"])[0]
+            gpus = int(query_params.get("gpus", [8])[0])
+            store = get_trace_store()
+            traces = store.list_traces(limit=1)
+            if traces:
+                rec = store.get_trace(traces[0].trace_id)
+                summary = rec.summary or analyze_spans(rec.spans)
+                report = detect_compute_waste(
+                    accelerator=accel,
+                    num_gpus=gpus,
+                    duration_ms=summary.total_duration_ms,
+                    total_cost_usd=summary.total_cost_usd,
+                    tokens_processed=summary.total_tokens,
+                    workload_id=traces[0].trace_id,
+                )
+            else:
+                report = detect_compute_waste(
+                    accelerator=accel,
+                    num_gpus=gpus,
+                    duration_ms=3600000.0,
+                    workload_id="workload-sample",
+                )
+            self._send_json(report.model_dump())
+            return
+
+        # API: Golden Signals Hierarchy
+        if path == "/api/golden-signals":
+            store = get_trace_store()
+            traces = store.list_traces(limit=1)
+            if traces:
+                rec = store.get_trace(traces[0].trace_id)
+                summary = rec.summary or analyze_spans(rec.spans)
+                signals = summary.golden_signals
+                if not signals:
+                    summary = analyze_spans(rec.spans)
+                    signals = summary.golden_signals
+            else:
+                from airun.events.models import (
+                    GoldenSignals,
+                    GoldenSignalsEconomics,
+                    GoldenSignalsEfficiency,
+                    GoldenSignalsInfrastructure,
+                    GoldenSignalsReliability,
+                )
+
+                signals = GoldenSignals(
+                    economics=GoldenSignalsEconomics(
+                        cost_per_effective_gpu_hour_usd=4.20,
+                        cost_per_1m_tokens_usd=1.85,
+                        financial_bleed_hourly_usd=4.80,
+                        total_wasted_spend_usd=14.20,
+                        waste_percentage=21.0,
+                    ),
+                    efficiency=GoldenSignalsEfficiency(
+                        mfu_pct=48.5,
+                        achieved_tflops=480.0,
+                        gpu_sm_utilization_pct=78.0,
+                        memory_bandwidth_utilization_pct=65.0,
+                        pcie_utilization_pct=42.0,
+                    ),
+                    reliability=GoldenSignalsReliability(
+                        job_failure_rate_pct=0.0,
+                        mean_time_to_recovery_ms=0.0,
+                        checkpoint_frequency_min=15.0,
+                    ),
+                    infrastructure=GoldenSignalsInfrastructure(
+                        power_draw_watts=350.0,
+                        thermal_throttling=False,
+                        pcie_error_count=0,
+                        network_retransmits_pct=0.01,
+                        pue=1.20,
+                    ),
+                )
+            self._send_json(signals.model_dump())
+            return
+
+        # API: Actionable Recommendations
+        if path == "/api/recommendations":
+            store = get_trace_store()
+            traces = store.list_traces(limit=1)
+            dur = 3600000.0
+            tot_cost = 28.0
+            w_id = "cluster-wide"
+            if traces:
+                rec = store.get_trace(traces[0].trace_id)
+                summary = rec.summary or analyze_spans(rec.spans)
+                dur = summary.total_duration_ms
+                tot_cost = summary.total_cost_usd
+                w_id = traces[0].trace_id
+            report = detect_compute_waste(
+                accelerator="h100",
+                num_gpus=8,
+                duration_ms=dur,
+                total_cost_usd=tot_cost,
+                workload_id=w_id,
+            )
+            self._send_json(report.recommendations)
+            return
+
+        # API: GKE Kubernetes DaemonSet Manifest
+        if path == "/api/manifests/daemonset":
+            manifest_path = (
+                Path(__file__).resolve().parent.parent.parent.parent
+                / "deploy"
+                / "kubernetes"
+                / "daemonset-agent.yaml"
+            )
+            if manifest_path.exists():
+                content = manifest_path.read_text(encoding="utf-8")
+            else:
+                content = "# airun GKE DaemonSet manifest"
+            self._send_json({"filename": "daemonset-agent.yaml", "manifest": content})
             return
 
         # Default: Serve the single-page HTML/CSS/JS dashboard
@@ -592,10 +710,13 @@ def get_dashboard_html() -> str:
     <!-- Navigation Tabs -->
     <div class="tabs-bar">
       <button class="tab-btn active" onclick="switchTab('tab-workloads', this)">📊 Execution Workloads</button>
+      <button class="tab-btn" onclick="switchTab('tab-waste', this)">💸 Financial Bleed & AI Waste</button>
+      <button class="tab-btn" onclick="switchTab('tab-golden', this)">🌟 Golden Signals Hierarchy</button>
       <button class="tab-btn" onclick="switchTab('tab-frontier', this)">⚡ Efficient Frontier of AI</button>
       <button class="tab-btn" onclick="switchTab('tab-dr', this)">🛡️ AI Breaker Box & Disaster Recovery</button>
       <button class="tab-btn" onclick="switchTab('tab-incident', this)">🔍 AI Causal Incident Graph</button>
     </div>
+
 
     <!-- Tab 1: Execution Workloads & Trace DAG Inspector -->
     <div id="tab-workloads" class="tab-content active">
@@ -732,6 +853,116 @@ def get_dashboard_html() -> str:
         </div>
       </div>
     </div>
+
+    <!-- Tab 5: The Physics of AI Waste & Financial Bleed -->
+    <div id="tab-waste" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">The Physics of AI Waste & Financial Bleed</div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Quantifies exact accelerator compute waste across Dataloader Starvation, NCCL Sync, PCIe Bus Saturation, and Framework Overhead.
+            </p>
+          </div>
+          <button class="btn" onclick="fetchWasteReport();">🔄 Recalculate</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+          <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:16px;">
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Hourly Financial Bleed</div>
+            <div id="waste-hourly-bleed" class="mono" style="font-size:1.8rem; font-weight:800; color:var(--critical);">$5.82 / hr</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">Active burn on idle GPU cycles</div>
+          </div>
+          <div style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:16px;">
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Model FLOPs Utilization (MFU)</div>
+            <div id="waste-mfu-val" class="mono" style="font-size:1.8rem; font-weight:800; color:var(--warning);">48.5%</div>
+            <div id="waste-mfu-sub" style="font-size:0.75rem; color:var(--text-muted);">Achieved vs Theoretical Peak FLOPs</div>
+          </div>
+          <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:16px;">
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Primary Bottleneck</div>
+            <div id="waste-top-bottleneck" class="mono" style="font-size:1.1rem; font-weight:700; color:#60a5fa; margin-top:6px;">Framework Overhead</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">Host-side Python dispatch bubbles</div>
+          </div>
+        </div>
+
+        <div class="panel-title" style="font-size:1rem; margin-bottom:12px;">4-Tier Physics of AI Waste Breakdown</div>
+        <div id="waste-components-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px;">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="panel-title" style="font-size:1rem; margin-bottom:12px;">Actionable FinOps Remediation & Projected Savings</div>
+        <div id="waste-recommendations-list" style="display:flex; flex-direction:column; gap:10px;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 6: Golden Signals Hierarchy & GKE DaemonSet -->
+    <div id="tab-golden" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">AI Infrastructure Golden Signals Hierarchy</div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Four-layer operational hierarchy organizing cluster telemetry from CFO economics to physical GPU hardware.
+            </p>
+          </div>
+          <button class="btn" onclick="fetchGoldenSignals();">🔄 Refresh Signals</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px;">
+          <!-- Layer 1: Economics -->
+          <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:18px;">
+            <div style="font-weight:700; color:var(--success); margin-bottom:12px; font-size:0.95rem;">1. Economics (CFO View)</div>
+            <div style="font-size:0.82rem; line-height:1.8; color:var(--text-muted);">
+              <div>Cost / Eff GPU-Hour: <strong id="gs-cost-gpu" class="mono" style="color:#fff;">$87.59</strong></div>
+              <div>Cost / 1M Tokens: <strong id="gs-cost-tokens" class="mono" style="color:#fff;">$1.5647</strong></div>
+              <div>Financial Bleed: <strong id="gs-bleed" class="mono" style="color:var(--critical);">$5.82/hr</strong></div>
+              <div>Wasted Spend: <strong id="gs-wasted" class="mono" style="color:var(--critical);">$0.0018</strong></div>
+            </div>
+          </div>
+
+          <!-- Layer 2: Efficiency -->
+          <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:18px;">
+            <div style="font-weight:700; color:var(--accent); margin-bottom:12px; font-size:0.95rem;">2. Efficiency (ML Engineer View)</div>
+            <div style="font-size:0.82rem; line-height:1.8; color:var(--text-muted);">
+              <div>Model FLOPs Util (MFU): <strong id="gs-mfu" class="mono" style="color:var(--warning);">48.5%</strong></div>
+              <div>Achieved TFLOPS: <strong id="gs-tflops" class="mono" style="color:#fff;">480.0 TFLOPS</strong></div>
+              <div>GPU SM Active Cycles: <strong id="gs-sm-util" class="mono" style="color:#fff;">78.0%</strong></div>
+              <div>Memory Bandwidth: <strong id="gs-mem-bw" class="mono" style="color:#fff;">65.0%</strong></div>
+            </div>
+          </div>
+
+          <!-- Layer 3: Reliability -->
+          <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:18px;">
+            <div style="font-weight:700; color:var(--warning); margin-bottom:12px; font-size:0.95rem;">3. Reliability (Platform View)</div>
+            <div style="font-size:0.82rem; line-height:1.8; color:var(--text-muted);">
+              <div>Job Failure Rate: <strong id="gs-fail-rate" class="mono" style="color:#fff;">0.0%</strong></div>
+              <div>Mean Recovery Time: <strong id="gs-mttr" class="mono" style="color:#fff;">0 ms</strong></div>
+              <div>Retry Count: <strong id="gs-retries" class="mono" style="color:#fff;">1</strong></div>
+              <div>Checkpoint Cadence: <strong id="gs-checkpoint" class="mono" style="color:#fff;">Every 15 min</strong></div>
+            </div>
+          </div>
+
+          <!-- Layer 4: Infrastructure -->
+          <div style="background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.3); border-radius:8px; padding:18px;">
+            <div style="font-weight:700; color:var(--purple); margin-bottom:12px; font-size:0.95rem;">4. Infrastructure (Physical Layer)</div>
+            <div style="font-size:0.82rem; line-height:1.8; color:var(--text-muted);">
+              <div>Power Draw: <strong id="gs-power" class="mono" style="color:#fff;">350 W</strong> (PUE 1.20)</div>
+              <div>Thermal State: <strong id="gs-thermal" class="mono" style="color:var(--success);">Nominal</strong></div>
+              <div>PCIe Bus Errors: <strong id="gs-pcie-err" class="mono" style="color:#fff;">0</strong></div>
+              <div>Network Retransmits: <strong id="gs-retrans" class="mono" style="color:#fff;">0.02%</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-header" style="margin-top:20px;">
+          <div class="panel-title">GKE GPU DaemonSet Collector Manifest</div>
+          <button class="btn btn-primary" onclick="copyDaemonSetManifest();">📋 Copy YAML</button>
+        </div>
+        <pre id="daemonset-manifest-code" class="mono" style="background:rgba(0,0,0,0.5); padding:16px; border-radius:8px; font-size:0.75rem; color:#a78bfa; overflow-x:auto; max-height:280px;">Loading manifest...</pre>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -741,10 +972,13 @@ def get_dashboard_html() -> str:
       document.getElementById(tabId).classList.add('active');
       if (btn) btn.classList.add('active');
 
+      if (tabId === 'tab-waste') fetchWasteReport();
+      if (tabId === 'tab-golden') { fetchGoldenSignals(); fetchDaemonSetManifest(); }
       if (tabId === 'tab-frontier') fetchFrontier();
       if (tabId === 'tab-dr') { fetchBreakers(); }
       if (tabId === 'tab-incident') fetchIncidentGraph('network_fabric');
     }
+
 
     async function fetchExecutiveMetrics() {
       try {
@@ -1037,6 +1271,111 @@ def get_dashboard_html() -> str:
       } catch (err) {
         console.error("Failed to load incident graph", err);
       }
+    }
+
+    async function fetchWasteReport() {
+      try {
+        const res = await fetch('/api/waste?accelerator=h100&gpus=8');
+        const data = await res.json();
+
+        document.getElementById('waste-hourly-bleed').innerText = `$${Number(data.hourly_financial_bleed_usd).toFixed(2)} / hr`;
+        document.getElementById('waste-top-bottleneck').innerText = data.top_bottleneck;
+
+        if (data.mfu) {
+          document.getElementById('waste-mfu-val').innerText = `${data.mfu.mfu_pct}%`;
+          document.getElementById('waste-mfu-sub').innerText = `${data.mfu.achieved_tflops} / ${data.mfu.total_theoretical_peak_tflops} TFLOPS [${data.mfu.efficiency_rating}]`;
+        }
+
+        const grid = document.getElementById('waste-components-grid');
+        grid.innerHTML = '';
+        data.waste_components.forEach(c => {
+          const card = document.createElement('div');
+          card.style.cssText = 'background:rgba(0,0,0,0.3); border:1px solid var(--card-border); border-radius:8px; padding:16px;';
+          card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <strong style="color:#fff; font-size:0.9rem;">${c.display_name}</strong>
+              <span class="mono" style="font-weight:700; color:${c.waste_pct >= 15 ? 'var(--critical)' : 'var(--warning)'};">${c.waste_pct}%</span>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">${c.diagnosis}</div>
+            <div class="mono" style="font-size:0.8rem; color:var(--critical); margin-bottom:6px;">Bleed: $${c.hourly_bleed_usd.toFixed(2)}/hr | Run: $${c.wasted_cost_usd.toFixed(4)}</div>
+            <div style="font-size:0.75rem; color:var(--success); background:rgba(16,185,129,0.06); padding:6px 8px; border-radius:4px;">
+              Fix: ${c.remediation}
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+
+        const recsList = document.getElementById('waste-recommendations-list');
+        recsList.innerHTML = '';
+        data.recommendations.forEach(r => {
+          const div = document.createElement('div');
+          div.style.cssText = 'background:rgba(255,255,255,0.02); border:1px solid var(--card-border); border-radius:6px; padding:12px; display:flex; justify-content:space-between; align-items:center;';
+          div.innerHTML = `
+            <div>
+              <strong style="color:#fff; font-size:0.88rem;">${r.title}</strong>
+              <div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">${r.action}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mono" style="font-weight:700; color:var(--success); font-size:0.95rem;">+$${Number(r.potential_weekly_savings_usd).toFixed(0)} / wk</div>
+              <div style="font-size:0.7rem; color:var(--text-muted);">+$${Number(r.potential_monthly_savings_usd).toFixed(0)} / mo</div>
+            </div>
+          `;
+          recsList.appendChild(div);
+        });
+      } catch (err) {
+        console.error("Failed to load waste report", err);
+      }
+    }
+
+    async function fetchGoldenSignals() {
+      try {
+        const res = await fetch('/api/golden-signals');
+        const data = await res.json();
+        const e = data.economics;
+        const eff = data.efficiency;
+        const rel = data.reliability;
+        const inf = data.infrastructure;
+
+        document.getElementById('gs-cost-gpu').innerText = `$${Number(e.cost_per_effective_gpu_hour_usd).toFixed(2)}`;
+        document.getElementById('gs-cost-tokens').innerText = e.cost_per_1m_tokens_usd ? `$${Number(e.cost_per_1m_tokens_usd).toFixed(4)}` : 'N/A';
+        document.getElementById('gs-bleed').innerText = `$${Number(e.financial_bleed_hourly_usd).toFixed(2)}/hr`;
+        document.getElementById('gs-wasted').innerText = `$${Number(e.total_wasted_spend_usd).toFixed(4)} (${e.waste_percentage.toFixed(1)}%)`;
+
+        document.getElementById('gs-mfu').innerText = `${eff.mfu_pct.toFixed(1)}%`;
+        document.getElementById('gs-tflops').innerText = `${eff.achieved_tflops.toFixed(1)} TFLOPS`;
+        document.getElementById('gs-sm-util').innerText = `${eff.gpu_sm_utilization_pct.toFixed(1)}%`;
+        document.getElementById('gs-mem-bw').innerText = `${eff.memory_bandwidth_utilization_pct.toFixed(1)}%`;
+
+        document.getElementById('gs-fail-rate').innerText = `${rel.job_failure_rate_pct.toFixed(1)}%`;
+        document.getElementById('gs-mttr').innerText = `${rel.mean_time_to_recovery_ms.toFixed(0)} ms`;
+        document.getElementById('gs-retries').innerText = `${rel.retry_count}`;
+        document.getElementById('gs-checkpoint').innerText = `Every ${rel.checkpoint_frequency_min.toFixed(0)} min`;
+
+        document.getElementById('gs-power').innerText = `${inf.power_draw_watts.toFixed(0)} W (PUE ${inf.pue.toFixed(2)})`;
+        document.getElementById('gs-thermal').innerText = inf.thermal_throttling ? 'THROTTLED' : 'Nominal';
+        document.getElementById('gs-thermal').style.color = inf.thermal_throttling ? 'var(--critical)' : 'var(--success)';
+        document.getElementById('gs-pcie-err').innerText = `${inf.pcie_error_count}`;
+        document.getElementById('gs-retrans').innerText = `${(inf.network_retransmits_pct * 100).toFixed(2)}%`;
+      } catch (err) {
+        console.error("Failed to load golden signals", err);
+      }
+    }
+
+    async function fetchDaemonSetManifest() {
+      try {
+        const res = await fetch('/api/manifests/daemonset');
+        const data = await res.json();
+        document.getElementById('daemonset-manifest-code').innerText = data.manifest;
+      } catch (err) {
+        document.getElementById('daemonset-manifest-code').innerText = '# Failed to load manifest';
+      }
+    }
+
+    function copyDaemonSetManifest() {
+      const code = document.getElementById('daemonset-manifest-code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        alert('GKE DaemonSet manifest copied to clipboard!');
+      });
     }
 
     // Initialize on page load

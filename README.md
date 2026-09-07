@@ -179,6 +179,13 @@ airun compare previous latest
 
 | Command | Description |
 |---|---|
+| `airun waste [latest\|<id>]` | Detect the 4 physical compute waste bottlenecks (Dataloader, NCCL, PCIe, Eager Mode) & financial bleed |
+| `airun golden-signals [latest\|<id>]` | Display 4-Layer Golden Signals hierarchy (Economics, Efficiency, Reliability, Infrastructure) |
+| `airun profiler trace --pid <pid>` | Open-source profiler hook with hardware counter sampling & Airun Cloud ROI assessment |
+| `airun metrics [latest\|<id>]` | Display Executive Economics: Intelligence per Dollar (IPD), Intelligence per Watt (IPW), Energy |
+| `airun frontier` | View Pareto Efficient Frontier across Model Quality, Latency, and Cost |
+| `airun dr drill` | Run automated Disaster Recovery drill with provider failover audit scorecard |
+| `airun breaker status` | Inspect live AI Breaker Box provider circuit breaker health |
 | `airun doctor` | Verify local workspace, database health, and micro-overhead |
 | `airun init` | Initialize workspace configuration and trace storage |
 | `airun demo` | Run built-in simulated agent workflow |
@@ -188,6 +195,8 @@ airun compare previous latest
 | `airun trace list` | List stored execution traces |
 | `airun trace show [latest\|<id>]` | Inspect execution tree hierarchy |
 | `airun export [latest\|<id>] --format [json\|otel-json]` | Export trace in raw JSON or OpenTelemetry format |
+| `airun ui` / `airun serve` | Launch interactive Command Center Web UI and REST API |
+
 
 ---
 

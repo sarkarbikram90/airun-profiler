@@ -24,9 +24,12 @@ class AcceleratorProfile(BaseModel):
     typical_load_pct: float = 0.75
     memory_type: str = "HBM"
     description: str = ""
+    peak_tflops_fp16: float = 300.0  # Dense non-sparse FP16/BF16 peak TFLOPS
+    memory_bandwidth_gbs: float = 1500.0  # Memory bandwidth in GB/s
+    typical_hourly_cost_usd: float = 2.50  # Typical cloud hourly burn rate per accelerator
 
 
-# Industry-standard hardware accelerator power specifications
+# Industry-standard hardware accelerator specifications
 ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
     "h100": AcceleratorProfile(
         name="NVIDIA H100 SXM5",
@@ -35,6 +38,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.75,
         memory_type="HBM3 (80GB)",
         description="Flagship frontier AI training and inference accelerator",
+        peak_tflops_fp16=989.0,
+        memory_bandwidth_gbs=3350.0,
+        typical_hourly_cost_usd=3.50,
     ),
     "h100_pcie": AcceleratorProfile(
         name="NVIDIA H100 PCIe",
@@ -43,6 +49,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.70,
         memory_type="HBM3 (80GB)",
         description="Enterprise PCIe form-factor H100",
+        peak_tflops_fp16=756.0,
+        memory_bandwidth_gbs=2000.0,
+        typical_hourly_cost_usd=2.80,
     ),
     "a100": AcceleratorProfile(
         name="NVIDIA A100 SXM4",
@@ -51,6 +60,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.70,
         memory_type="HBM2e (80GB)",
         description="Standard enterprise deep learning workhorse",
+        peak_tflops_fp16=312.0,
+        memory_bandwidth_gbs=2039.0,
+        typical_hourly_cost_usd=2.20,
     ),
     "b200": AcceleratorProfile(
         name="NVIDIA B200 Blackwell",
@@ -59,6 +71,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.80,
         memory_type="HBM3e (192GB)",
         description="Next-generation exascale frontier AI accelerator",
+        peak_tflops_fp16=2250.0,
+        memory_bandwidth_gbs=8000.0,
+        typical_hourly_cost_usd=4.50,
     ),
     "l40s": AcceleratorProfile(
         name="NVIDIA L40S",
@@ -67,6 +82,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.70,
         memory_type="GDDR6 (48GB)",
         description="Optimized for LLM inference and multimodal workloads",
+        peak_tflops_fp16=362.0,
+        memory_bandwidth_gbs=864.0,
+        typical_hourly_cost_usd=1.50,
     ),
     "tpu_v5e": AcceleratorProfile(
         name="Google TPU v5e",
@@ -75,6 +93,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.70,
         memory_type="HBM2 (16GB)",
         description="Cost-efficient Google Cloud custom AI ASIC",
+        peak_tflops_fp16=197.0,
+        memory_bandwidth_gbs=819.0,
+        typical_hourly_cost_usd=1.20,
     ),
     "mi300x": AcceleratorProfile(
         name="AMD Instinct MI300X",
@@ -83,6 +104,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.75,
         memory_type="HBM3 (192GB)",
         description="High-capacity open-ecosystem generative AI accelerator",
+        peak_tflops_fp16=1300.0,
+        memory_bandwidth_gbs=5300.0,
+        typical_hourly_cost_usd=3.20,
     ),
     "apple_silicon": AcceleratorProfile(
         name="Apple M-Series Neural Engine",
@@ -91,6 +115,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.55,
         memory_type="Unified Memory",
         description="Local on-device inference for edge AI and local models",
+        peak_tflops_fp16=38.0,
+        memory_bandwidth_gbs=400.0,
+        typical_hourly_cost_usd=0.15,
     ),
     "generic_cloud": AcceleratorProfile(
         name="Generic Cloud AI Accelerator",
@@ -99,6 +126,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.70,
         memory_type="Shared GPU VRAM",
         description="Default cloud inference endpoint allocation",
+        peak_tflops_fp16=250.0,
+        memory_bandwidth_gbs=1000.0,
+        typical_hourly_cost_usd=1.80,
     ),
     "cpu": AcceleratorProfile(
         name="Host Server CPU",
@@ -107,6 +137,9 @@ ACCELERATOR_CATALOG: Dict[str, AcceleratorProfile] = {
         typical_load_pct=0.50,
         memory_type="System RAM",
         description="CPU fallback inference or pre-processing",
+        peak_tflops_fp16=2.0,
+        memory_bandwidth_gbs=100.0,
+        typical_hourly_cost_usd=0.20,
     ),
 }
 

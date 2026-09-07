@@ -494,3 +494,202 @@ def render_breaker_status_table(statuses: List[Any]) -> Table:
         )
 
     return table
+
+
+def render_waste_analysis_panel(report: Any) -> Panel:
+    """Render Physics of AI Waste and Financial Bleed panel."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column("Key", style="bold white")
+    table.add_column("Value", style="cyan")
+
+    table.add_row("Workload ID", report.workload_id)
+    table.add_row("Accelerator", f"{report.num_gpus}x {report.accelerator}")
+    table.add_row("Duration", f"{format_duration(report.duration_ms)}")
+    table.add_row("Total Spend", f"[bold green]{format_cost(report.total_cost_usd)}[/bold green]")
+
+    waste_color = (
+        "red"
+        if report.total_waste_pct >= 20.0
+        else ("yellow" if report.total_waste_pct >= 10.0 else "green")
+    )
+    table.add_row(
+        "Compute Waste",
+        f"[bold {waste_color}]{report.total_waste_pct:.1f}%[/bold {waste_color}] ({format_cost(report.total_wasted_cost_usd)} wasted)",
+    )
+    table.add_row(
+        "Hourly Financial Bleed",
+        f"[bold red]${report.hourly_financial_bleed_usd:.2f}/hr[/bold red] (Burn: ${report.hourly_burn_rate_usd:.2f}/hr)",
+    )
+    table.add_row("Top Bottleneck", f"[bold yellow]{report.top_bottleneck}[/bold yellow]")
+
+    if report.mfu:
+        mfu = report.mfu
+        mfu_color = "green" if mfu.mfu_pct >= 45.0 else ("yellow" if mfu.mfu_pct >= 30.0 else "red")
+        table.add_row(
+            "Model FLOPs Utilization (MFU)",
+            f"[bold {mfu_color}]{mfu.mfu_pct:.1f}%[/bold {mfu_color}] [{mfu.efficiency_rating}] ({mfu.achieved_tflops:.1f} / {mfu.total_theoretical_peak_tflops:.1f} TFLOPS)",
+        )
+
+    # Sub-table for waste components
+    comp_table = Table(
+        title="[bold yellow]Physics of AI Waste Breakdown[/bold yellow]",
+        border_style="dim yellow",
+        show_header=True,
+    )
+    comp_table.add_column("Bottleneck Mechanism", style="bold white")
+    comp_table.add_column("Waste %", justify="right")
+    comp_table.add_column("Run Cost", justify="right", style="red")
+    comp_table.add_column("Hourly Bleed", justify="right", style="bold red")
+    comp_table.add_column("Remediation", style="green")
+
+    for c in report.waste_components:
+        comp_table.add_row(
+            c.display_name,
+            f"{c.waste_pct:.1f}%",
+            format_cost(c.wasted_cost_usd),
+            f"${c.hourly_bleed_usd:.2f}/hr",
+            c.remediation[:60] + ("..." if len(c.remediation) > 60 else ""),
+        )
+
+    outer_grid = Table.grid(padding=(1, 0))
+    outer_grid.add_row(table)
+    outer_grid.add_row(comp_table)
+
+    if report.recommendations:
+        recs_text = "\n".join(
+            f"[*] [bold]{r.get('title')}[/bold] (Save ${r.get('potential_weekly_savings_usd', 0):.0f}/wk): {r.get('action')}"
+            for r in report.recommendations[:3]
+        )
+        outer_grid.add_row(
+            Panel(
+                recs_text,
+                title="[bold green]Actionable FinOps Remediation[/bold green]",
+                border_style="green",
+            )
+        )
+
+    return Panel(
+        outer_grid,
+        title="[bold cyan]The Physics of AI Waste & Financial Bleed Report[/bold cyan]",
+        border_style="bright_blue",
+        expand=False,
+    )
+
+
+def render_golden_signals_panel(signals: Any) -> Panel:
+    """Render 4-Layer Golden Signals Hierarchy for AI Infrastructure."""
+    grid = Table.grid(padding=(1, 2))
+    grid.add_column("Left", justify="left")
+    grid.add_column("Right", justify="left")
+
+    # Layer 1: Economics
+    econ = signals.economics
+    t1 = Table(title="[bold green]1. Economics (CFO View)[/bold green]", border_style="green")
+    t1.add_column("Signal", style="white")
+    t1.add_column("Value", style="cyan")
+    t1.add_row("Cost / Eff GPU-Hour", f"${econ.cost_per_effective_gpu_hour_usd:.2f}")
+    if econ.cost_per_1m_tokens_usd is not None:
+        t1.add_row("Cost / 1M Tokens", f"${econ.cost_per_1m_tokens_usd:.4f}")
+    t1.add_row("Financial Bleed", f"[bold red]${econ.financial_bleed_hourly_usd:.2f}/hr[/bold red]")
+    t1.add_row(
+        "Wasted Spend",
+        f"[bold red]${econ.total_wasted_spend_usd:.4f}[/bold red] ({econ.waste_percentage:.1f}%)",
+    )
+
+    # Layer 2: Efficiency
+    eff = signals.efficiency
+    t2 = Table(title="[bold cyan]2. Efficiency (ML Engineer View)[/bold cyan]", border_style="cyan")
+    t2.add_column("Signal", style="white")
+    t2.add_column("Value", style="cyan")
+    t2.add_row("Model FLOPs Util (MFU)", f"[bold yellow]{eff.mfu_pct:.1f}%[/bold yellow]")
+    t2.add_row("Achieved Throughput", f"{eff.achieved_tflops:.1f} TFLOPS")
+    t2.add_row("GPU SM Utilization", f"{eff.gpu_sm_utilization_pct:.1f}%")
+    t2.add_row("Memory Bandwidth", f"{eff.memory_bandwidth_utilization_pct:.1f}%")
+
+    # Layer 3: Reliability
+    rel = signals.reliability
+    t3 = Table(
+        title="[bold yellow]3. Reliability (Platform View)[/bold yellow]", border_style="yellow"
+    )
+    t3.add_column("Signal", style="white")
+    t3.add_column("Value", style="cyan")
+    t3.add_row("Job Failure Rate", f"{rel.job_failure_rate_pct:.1f}%")
+    t3.add_row("Mean Recovery Time", f"{rel.mean_time_to_recovery_ms:.0f}ms")
+    t3.add_row("Step Retries", str(rel.retry_count))
+    t3.add_row("Checkpoint Cadence", f"Every {rel.checkpoint_frequency_min:.0f} min")
+
+    # Layer 4: Infrastructure
+    infra = signals.infrastructure
+    t4 = Table(
+        title="[bold magenta]4. Infrastructure (Physical Layer)[/bold magenta]",
+        border_style="magenta",
+    )
+    t4.add_column("Signal", style="white")
+    t4.add_column("Value", style="cyan")
+    t4.add_row("Active Power Draw", f"{infra.power_draw_watts:.0f} W (PUE {infra.pue:.2f})")
+    t4.add_row(
+        "Thermal Throttling",
+        "[green]No Throttling[/green]" if not infra.thermal_throttling else "[red]THROTTLED[/red]",
+    )
+    t4.add_row("PCIe Bus Errors", str(infra.pcie_error_count))
+    t4.add_row("Network Retransmits", f"{infra.network_retransmits_pct * 100:.2f}%")
+
+    grid.add_row(t1, t2)
+    grid.add_row(t3, t4)
+
+    return Panel(
+        grid,
+        title="[bold bright_white]AI Infrastructure Golden Signals Hierarchy[/bold bright_white]",
+        border_style="bright_blue",
+        expand=False,
+    )
+
+
+def render_profiler_summary_panel(
+    pid: int,
+    duration_sec: float,
+    accelerator: str,
+    waste_report: Any,
+) -> Panel:
+    """Render open-source CLI profiler hook output with GTM upsell banner."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column("Metric", style="bold white")
+    table.add_column("Observation", style="cyan")
+
+    table.add_row("Target Process PID", str(pid))
+    table.add_row("Profile Duration", f"{duration_sec:.1f}s")
+    table.add_row("Target Accelerator", accelerator)
+    table.add_row(
+        "Detected Bottleneck", f"[bold yellow]{waste_report.top_bottleneck}[/bold yellow]"
+    )
+    table.add_row(
+        "Compute Waste",
+        f"[bold red]{waste_report.total_waste_pct:.1f}%[/bold red] (${waste_report.total_wasted_cost_usd:.4f} wasted)",
+    )
+
+    hours_lost = (
+        (waste_report.total_waste_pct / 100.0) * (duration_sec / 3600.0) * waste_report.num_gpus
+    )
+    dollars_lost = waste_report.total_wasted_cost_usd
+
+    upsell_banner = (
+        f"[bold yellow]You lost {hours_lost:.2f} hours of {accelerator} time on this run (${dollars_lost:.2f}).\n"
+        f"Want to see how this scales across your whole cluster? Sign up for Airun Cloud: https://airun.dev/cloud[/bold yellow]"
+    )
+
+    grid = Table.grid(padding=(1, 0))
+    grid.add_row(table)
+    grid.add_row(
+        Panel(
+            upsell_banner,
+            title="[bold cyan]Airun Cloud ROI Assessment[/bold cyan]",
+            border_style="yellow",
+        )
+    )
+
+    return Panel(
+        grid,
+        title="[bold green]Airun Open-Source Profiler Trace Output[/bold green]",
+        border_style="green",
+        expand=False,
+    )
