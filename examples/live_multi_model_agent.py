@@ -41,7 +41,9 @@ async def call_gemini_planner(user_query: str) -> Dict[str, Any]:
 
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel("gemini-1.5-flash")
-            prompt = f"Decompose this research request into search queries and subtasks: {user_query}"
+            prompt = (
+                f"Decompose this research request into search queries and subtasks: {user_query}"
+            )
             response = await asyncio.to_thread(model.generate_content, prompt)
 
             # Record token usage from Gemini usage_metadata
@@ -88,7 +90,9 @@ async def call_openai_analyst(context: str, plan: Dict[str, Any]) -> str:
             from openai import OpenAI
 
             client = OpenAI(api_key=api_key)
-            prompt = f"Analyze the following data based on the plan:\nPlan: {plan}\nContext: {context}"
+            prompt = (
+                f"Analyze the following data based on the plan:\nPlan: {plan}\nContext: {context}"
+            )
             response = await asyncio.to_thread(
                 client.chat.completions.create,
                 model="gpt-4o",
@@ -102,7 +106,9 @@ async def call_openai_analyst(context: str, plan: Dict[str, Any]) -> str:
                 input_tokens=usage.prompt_tokens,
                 output_tokens=usage.completion_tokens,
             )
-            set_span_metadata({"finish_reason": response.choices[0].finish_reason, "real_api": True})
+            set_span_metadata(
+                {"finish_reason": response.choices[0].finish_reason, "real_api": True}
+            )
             return response.choices[0].message.content
         except Exception as e:
             set_span_metadata({"api_error": str(e), "fallback": True})

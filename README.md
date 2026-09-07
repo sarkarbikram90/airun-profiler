@@ -1,27 +1,32 @@
-# AI Runtime Profiler (`airun`)
+# AI Infrastructure Reliability & Economics Platform (`airun`)
 
 [![CI](https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml/badge.svg)](https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
 
-> **"What exactly happened during this AI workload, and what did it cost?"**
+> **"Automatically get the maximum intelligence per dollar and watt."**
 
-`airun` is a lightweight, local-first runtime profiler and economic measurement layer for AI agents, multi-step LLM pipelines, and tool-augmented workflows.
+`airun` is a local-first **AI Infrastructure Reliability and Economics Platform** for Python 3.11+. It bridges the gap between physical silicon, data center electrical power, multi-model execution, and enterprise business continuity.
 
 ---
 
 ## Key Features
 
-- **Zero-Friction Tracing**: Instrument functions and async coroutines in seconds with `@trace` or `with trace()`.
-- **Accurate Cost Engine**: Automatic token-level cost attribution for OpenAI, Anthropic, Gemini, Mistral, and local GPU infrastructure.
+- **Intelligence per Dollar (IPD) & Watt (IPW)**: Core economic efficiency metrics:
+  $$\text{IPD} = \frac{\text{Validated Output}}{\text{Compute Cost} + \text{Energy Cost}}$$
+  $$\text{IPW} = \frac{\text{Validated Output}}{\text{Energy (kWh)}}$$
+- **Hardware Accelerator Power Modeling**: Electrical TDP specifications for NVIDIA H100 (SXM/PCIe), A100, B200 Blackwell, L40S, Google TPU v5e, AMD MI300X, and Apple Silicon with data center PUE modeling.
+- **The Efficient Frontier of AI**: Multi-dimensional Pareto optimal frontier plotting models across (Quality vs Cost vs Latency) for dynamic model selection without regression.
+- **Eval-Driven Routing**: Policy engine enforcing quality SLA constraints (Tier 1 $\ge 0.95$, Tier 2 $\ge 0.88$, Tier 3 Economy) with background shadow testing on cheaper candidates.
+- **The AI Breaker Box**: Multi-provider resilience with automated circuit breakers (`CLOSED`, `OPEN`, `HALF-OPEN`) that detect provider outages, latency spikes, and quality degradation.
+- **Semantic Equivalence Mapping**: Automatic translation of prompts, generation parameters, and tool/function calling schemas across OpenAI, Anthropic, Google Gemini, and Local formats.
+- **AI Disaster Recovery (DR) Drills (`airun dr drill`)**: Automated fault injection simulations measuring capability parity, quality retention %, latency delta, and cost delta during outages.
+- **AI-Aware Causal Incident Graph**: Diagnostic graph correlating hardware issues (GPU Xid 79, PCIe Gen1 throttling), network fabric stalls, and NCCL barrier timeouts to wasted dollars.
+- **Executive Command Center (`airun ui`)**: Interactive Web UI featuring real-time KPI tiles, Pareto frontier visualizer, circuit breaker status, and trace DAG inspector.
+- **Zero-Friction Tracing**: Universal `@trace` decorator and `with trace()` context manager.
 - **Concurrent Critical Path**: Accurately computes critical-path latency across parallel tools using interval DAG scheduling.
-- **Automated Diagnostic Findings**: Heuristic detection of cost concentration, retry storms, token context bloat, and over-provisioned models.
-- **Outcome-Based Economics**: Explicit attribution of **Cost per Successful Outcome** vs **Wasted Cost** on failed/aborted executions.
-- **Regression Diffing (`airun compare`)**: Side-by-side run comparison to detect latency, token, cost, and quality regressions.
-- **The Evaluation Boundary**: Attach evaluation scores (`set_span_quality()`) to prove cost optimizations preserve output quality.
-- **Privacy by Default**: Automatic secret and API key redaction. Prompt and completion contents are never stored without explicit opt-in.
-- **OpenTelemetry Compatible**: Export traces directly as OTLP-compliant JSON.
+- **Privacy by Default**: Automatic API key and sensitive token redaction. Prompt and completion contents are never stored without explicit opt-in.
 - **Ultra-Low Overhead**: Measured in-memory span overhead is $<20\mu\text{s}$ and total SQLite persistence overhead is $<1\text{ms}$ per workflow.
 
 ---

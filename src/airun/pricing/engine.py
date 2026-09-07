@@ -58,6 +58,8 @@ class CostEngine:
         input_tokens: Optional[int] = 0,
         output_tokens: Optional[int] = 0,
         duration_ms: Optional[float] = None,
+        accelerator: Optional[str] = None,
+        include_energy: bool = False,
     ) -> Optional[float]:
         """
         Calculate total cost in USD for a model call.
@@ -91,7 +93,14 @@ class CostEngine:
             hours = duration_ms / (1000.0 * 3600.0)
             infra_cost = hours * pricing.estimated_infra_cost_per_hour
 
-        return token_cost + infra_cost
+        energy_cost = 0.0
+        if include_energy and duration_ms:
+            from airun.pricing.energy import calculate_energy
+
+            metrics = calculate_energy(duration_ms=duration_ms, accelerator=accelerator)
+            energy_cost = metrics.energy_cost_usd
+
+        return token_cost + infra_cost + energy_cost
 
 
 # Global default engine instance
@@ -110,5 +119,9 @@ def calculate_cost(
     input_tokens: Optional[int] = 0,
     output_tokens: Optional[int] = 0,
     duration_ms: Optional[float] = None,
+    accelerator: Optional[str] = None,
+    include_energy: bool = False,
 ) -> Optional[float]:
-    return get_cost_engine().calculate_cost(model, input_tokens, output_tokens, duration_ms)
+    return get_cost_engine().calculate_cost(
+        model, input_tokens, output_tokens, duration_ms, accelerator, include_energy
+    )

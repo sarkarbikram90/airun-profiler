@@ -100,3 +100,6 @@ docs/_build/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# specs
+spec.md

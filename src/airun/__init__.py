@@ -12,7 +12,26 @@ from airun.events.models import (
     TraceSpan,
     TraceSummary,
 )
+from airun.incident.graph import build_sample_incident_graph
+from airun.pricing.energy import (
+    calculate_energy,
+    calculate_intelligence_per_dollar,
+    calculate_intelligence_per_watt,
+)
 from airun.pricing.engine import calculate_cost, get_cost_engine
+from airun.resilience import (
+    AIBreaker,
+    ResilienceManager,
+    get_resilience_manager,
+    run_disaster_recovery_drill,
+)
+from airun.routing import (
+    EvalRouter,
+    RoutingPolicy,
+    RoutingTier,
+    get_efficient_frontier,
+    get_eval_router,
+)
 from airun.sdk.context import (
     get_collected_spans,
     get_current_span,
@@ -35,7 +54,7 @@ from airun.sdk.tracer import (
 from airun.sdk.wrappers import wrap_openai_client
 from airun.store import get_trace_store
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 __all__ = [
     "trace",
@@ -60,8 +79,21 @@ __all__ = [
     "get_collected_spans",
     "reset_trace_context",
     "calculate_cost",
+    "calculate_energy",
+    "calculate_intelligence_per_dollar",
+    "calculate_intelligence_per_watt",
     "get_cost_engine",
     "get_trace_store",
     "redact_data",
     "wrap_openai_client",
+    "get_efficient_frontier",
+    "EvalRouter",
+    "RoutingPolicy",
+    "RoutingTier",
+    "get_eval_router",
+    "AIBreaker",
+    "ResilienceManager",
+    "get_resilience_manager",
+    "run_disaster_recovery_drill",
+    "build_sample_incident_graph",
 ]

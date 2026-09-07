@@ -2,6 +2,39 @@
 
 All notable changes to `airun` are documented in this file.
 
+## [0.2.0] - 2026-09-07
+
+### Added
+- **AI Infrastructure Command Center (`airun ui` / `airun serve`)**:
+  - Executive KPI Command Center displaying Compute Cost, Energy Spend, Cluster & Effective Utilization, Intelligence / $, Intelligence / Watt, and Wasted Compute.
+  - Interactive top bottleneck incident banner with daily projected savings and remediation recommendations.
+  - Efficient Frontier visualizer plotting models across Quality vs Cost vs Latency with Pareto status.
+  - The AI Breaker Box provider status cards with live state indicators (`CLOSED`, `OPEN`, `HALF-OPEN`) and one-click Disaster Recovery (DR) simulation.
+  - AI-Aware Causal Incident Graph inspector mapping physical silicon, fabric stalls, and barrier timeouts to wasted compute dollars.
+- **Hardware Accelerator Power & Energy Economics Engine (`src/airun/pricing/energy.py`)**:
+  - Electrical specifications and TDP profiles for NVIDIA H100 (SXM & PCIe), A100, B200 Blackwell, L40S, Google TPU v5e, AMD MI300X, and Apple Silicon.
+  - Data center PUE (1.20) and utility electricity schedule modeling ($/kWh).
+  - Formulas for **Intelligence per Dollar (IPD)**, **Intelligence per Watt (IPW)**, Tokens/$, and Tokens/kWh.
+- **The Efficient Frontier of AI & Eval-Driven Routing (`src/airun/routing/`)**:
+  - Multi-dimensional Pareto frontier calculator across Quality Score, Blended Cost per 1M tokens, and Typical Latency.
+  - Tier-based routing policy engine (`TIER_1_CRITICAL`, `TIER_2_STANDARD`, `TIER_3_ECONOMY`).
+  - Continuous shadow testing simulator to evaluate cheaper candidate models on live traffic without SLA violation.
+- **The AI Breaker Box & AI Disaster Recovery (DR) Continuity (`src/airun/resilience/`)**:
+  - Resilient circuit breaker state machine (`CLOSED`, `OPEN`, `HALF-OPEN`) protecting against API outages, latency spikes, and silent semantic quality collapse.
+  - Semantic Equivalence Mapping engine translating system prompts, parameter bounds, and tool schemas across OpenAI, Anthropic, Google Gemini, and Local dialects.
+  - Automated synthetic Disaster Recovery drills (`airun dr drill`) measuring capability parity, quality retention, and economic delta.
+- **AI-Aware Causal Incident Graph (`src/airun/incident/`)**:
+  - Discrete causal graph linking hardware degradations (GPU Xid 79, PCIe Gen1 throttling), network fabric deadlocks (PFC buffer overruns), and AllReduce barrier stalls to financial compute loss.
+- **New CLI Commands (`src/airun/cli/`)**:
+  - `airun metrics [trace_id]`: Executive Economics panel showing IPD, IPW, energy consumption, and cluster efficiency.
+  - `airun frontier`: Displays the Efficient Frontier table and Pareto-optimal models.
+  - `airun dr drill`: Runs automated synthetic DR drill and prints the continuity audit scorecard.
+  - `airun breaker status`: Renders live AI Breaker Box circuit states across providers.
+- **New Executable Workloads (`examples/`)**:
+  - `examples/eval_routed_workflow.py`: Eval-driven routing and shadow testing.
+  - `examples/disaster_recovery_drill.py`: Fault injection, AI Breaker trip, and semantic failover.
+  - `examples/energy_and_power_profiling.py`: H100 TDP power profiling and Intelligence per Watt metrics.
+
 ## [0.1.2] - 2026-08-30
 
 ### Added

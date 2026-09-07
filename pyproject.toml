@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "airun-profiler"
-version = "0.1.2"
-description = "AI Runtime Profiler: Observe execution paths, latency, tool calls, retries, and token cost of AI workflows."
+version = "0.2.0"
+description = "AI Infrastructure Reliability & Economics Platform: Intelligence per Dollar & Watt, Energy Profiling, Eval-Driven Routing, and AI Disaster Recovery."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [

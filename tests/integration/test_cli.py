@@ -107,9 +107,7 @@ def test_cli_run_with_trace_id_file(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     )
     trace_id_file = tmp_path / "trace_id.txt"
 
-    res_run = runner.invoke(
-        app, ["run", str(script_path), "--trace-id-file", str(trace_id_file)]
-    )
+    res_run = runner.invoke(app, ["run", str(script_path), "--trace-id-file", str(trace_id_file)])
     assert res_run.exit_code == 0
     assert trace_id_file.exists()
     saved_id = trace_id_file.read_text(encoding="utf-8").strip()

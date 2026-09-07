@@ -18,8 +18,12 @@ from airun.analysis.analyzer import analyze_spans
 from airun.analysis.comparator import compare_traces
 from airun.cli.formatting import (
     build_rich_tree,
+    render_breaker_status_table,
     render_comparison_panel,
     render_cost_drivers_table,
+    render_dr_drill_panel,
+    render_efficient_frontier_table,
+    render_executive_metrics_panel,
     render_findings_panel,
     render_trace_summary_panel,
     render_traces_list_table,
@@ -29,6 +33,9 @@ from airun.exporters.json_export import export_trace_to_json
 from airun.exporters.otel_export import export_trace_to_otel
 from airun.graph.builder import ExecutionGraph
 from airun.pricing.defaults import DEFAULT_MODEL_PRICING
+from airun.resilience.breaker import get_resilience_manager
+from airun.resilience.dr_drills import run_disaster_recovery_drill
+from airun.routing.frontier import get_efficient_frontier
 from airun.sdk.tracer import record_retry, set_span_metadata, set_span_tokens, trace
 from airun.store import get_trace_store
 from airun.store.base import TraceStore
@@ -37,11 +44,16 @@ from airun.utils.time_utils import format_cost, format_duration, perf_counter_ms
 
 app = typer.Typer(
     name="airun",
-    help="AI Runtime Profiler: Observe execution paths, latency, tool calls, and token cost of AI workflows.",
+    help="AI Infrastructure Reliability & Economics Platform: Measure compute, power, IPD, IPW, and multi-provider resilience.",
     no_args_is_help=True,
 )
 trace_app = typer.Typer(help="Manage and inspect captured execution traces.")
+dr_app = typer.Typer(help="Execute and evaluate AI Disaster Recovery (DR) drills.")
+breaker_app = typer.Typer(help="Inspect and manage the AI Breaker Box.")
+
 app.add_typer(trace_app, name="trace")
+app.add_typer(dr_app, name="dr")
+app.add_typer(breaker_app, name="breaker")
 
 console = Console()
 
@@ -345,7 +357,9 @@ def run(
                 f.write(latest.trace_id)
 
         if trace_id_file and trace_id_file.exists():
-            console.print(f"[dim]Trace ID written to: [bold white]{trace_id_file}[/bold white][/dim]")
+            console.print(
+                f"[dim]Trace ID written to: [bold white]{trace_id_file}[/bold white][/dim]"
+            )
 
         console.print(
             f"\n[bold green][OK] Execution Profiled Successfully![/bold green] (Trace ID: [cyan]{latest.trace_id}[/cyan])"
@@ -428,7 +442,9 @@ def doctor() -> None:
 @app.command("ui")
 @app.command("serve")
 def serve_dashboard(
-    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host address to bind the web server"),
+    host: str = typer.Option(
+        "127.0.0.1", "--host", "-h", help="Host address to bind the web server"
+    ),
     port: int = typer.Option(8765, "--port", "-p", help="Port number for the dashboard web server"),
 ):
     """Launch the interactive airun Web UI and executive dashboard."""
@@ -436,3 +452,60 @@ def serve_dashboard(
 
     start_server(host=host, port=port)
 
+
+@app.command("metrics")
+def metrics(
+    trace_id: str = typer.Argument("latest", help="Trace ID to inspect (or 'latest')."),
+) -> None:
+    """Display Executive Economics: Intelligence per Dollar (IPD), Intelligence per Watt (IPW), and Energy."""
+    store = get_trace_store()
+    resolved_id = _resolve_trace_id(trace_id, store)
+    record = store.get_trace(resolved_id)
+
+    if not record:
+        console.print(f"[bold red]Trace '{trace_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    summary = record.summary or analyze_spans(record.spans)
+    console.print("\n", render_executive_metrics_panel(summary), "\n")
+
+
+@app.command("frontier")
+def frontier() -> None:
+    """Display the Efficient Frontier of AI (Pareto optimality across Quality, Cost, and Latency)."""
+    models = get_efficient_frontier()
+    console.print("\n", render_efficient_frontier_table(models), "\n")
+
+
+@dr_app.command("drill")
+def execute_dr_drill(
+    primary: str = typer.Option(
+        "openai", "--primary", "-p", help="Primary provider to inject failure into."
+    ),
+    fallback: str = typer.Option(
+        "anthropic", "--fallback", "-f", help="Fallback provider to promote."
+    ),
+    fault: str = typer.Option(
+        "outage_500",
+        "--fault",
+        help="Fault type: 'outage_500', 'latency_spike', 'quality_collapse'.",
+    ),
+) -> None:
+    """Execute an automated synthetic Disaster Recovery drill and render business continuity audit."""
+    console.print(
+        f"\n[bold cyan]>> Executing AI Disaster Recovery Drill: failing {primary} -> promoting {fallback}...[/bold cyan]\n"
+    )
+    report = run_disaster_recovery_drill(
+        primary_provider=primary,
+        fallback_provider=fallback,
+        fault_type=fault,
+    )
+    console.print(render_dr_drill_panel(report), "\n")
+
+
+@breaker_app.command("status")
+def breaker_status() -> None:
+    """Display live circuit breaker statuses across all configured AI providers."""
+    mgr = get_resilience_manager()
+    statuses = mgr.get_all_statuses()
+    console.print("\n", render_breaker_status_table(statuses), "\n")

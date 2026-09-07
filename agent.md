@@ -14,13 +14,13 @@
 ```text
 Observe → Explain → Optimize → Control → Automate
 ```
-- **v0.1.x (Current)**: **Observe & Explain** — Zero-overhead DAG tracing, token pricing engine, interval critical-path analysis, and severity-graded diagnostic findings.
-- **Milestone AIRUN-100**: Profile 100 real AI workload observations with 20 external engineers to identify the single recurring control-plane problem that teams will pay to eliminate.
-- **v0.2.0+ (Future)**: The validated wedge selected from empirical signal:
-  1. *Execution Optimization & Model Routing*
-  2. *CI/CD Cost Regression & Budget Guard*
-  3. *Runtime Failure Protection & Circuit Breakers*
-  4. *Emergent Unanticipated Wedge*
+- **v0.1.x**: **Observe & Explain** — Zero-overhead DAG tracing, token pricing engine, interval critical-path analysis, and severity-graded diagnostic findings.
+- **v0.2.0 (Current)**: **AI Infrastructure Reliability & Economics Platform** (as specified in `spec.md`):
+  1. *Intelligence per Dollar (IPD) & Watt (IPW)* with hardware accelerator power modeling (H100, A100, B200, TPU).
+  2. *The Efficient Frontier of AI & Eval-Driven Routing* with Pareto optimality and background shadow testing.
+  3. *The AI Breaker Box & Automated Disaster Recovery (DR)* with Semantic Equivalence Mapping across providers.
+  4. *AI-Aware Causal Incident Graph* linking physical silicon and fabric stalls to unrecoverable compute dollars.
+  5. *Executive Command Center Web UI* (`airun ui`) and rich CLI commands (`metrics`, `frontier`, `dr`, `breaker`).
 
 ---
 
@@ -28,8 +28,8 @@ Observe → Explain → Optimize → Control → Automate
 
 ```text
 airun-tracing/
-├── src/airun/                      # Core Package (12 modules, 85% test coverage)
-│   ├── __init__.py                 # Top-level exports: trace, SpanKind, set_span_quality, etc.
+├── src/airun/                      # Core Package (18 modules, 83% test coverage)
+│   ├── __init__.py                 # Top-level exports: trace, SpanKind, calculate_energy, EvalRouter, etc.
 │   ├── __main__.py                 # CLI entrypoint for 'python -m airun'
 │   ├── config.py                   # Pydantic configuration loader (.airun/config.yaml)
 │   ├── sdk/                        # Instrumentation SDK
@@ -38,7 +38,7 @@ airun-tracing/
 │   │   ├── redaction.py            # Automatic API key & secret redaction engine
 │   │   └── wrappers.py             # Client wrappers (OpenAI client auto-instrumentation)
 │   ├── events/                     # Data Models
-│   │   └── models.py               # TraceSpan, TraceSummary, DiagnosticFinding, FindingSeverity
+│   │   └── models.py               # TraceSpan, TraceSummary (with Energy, IPD, IPW telemetry)
 │   ├── store/                      # Persistence Layer
 │   │   ├── base.py                 # Abstract TraceStore interface
 │   │   ├── sqlite.py               # Local SQLite store with WAL mode & prefix queries
@@ -47,17 +47,26 @@ airun-tracing/
 │   │   ├── builder.py              # SpanNode & ExecutionGraph (fan-out, joins, descendants)
 │   │   └── critical_path.py        # Interval dynamic programming critical-path calculator
 │   ├── analysis/                   # Economic & Diagnostic Intelligence
-│   │   ├── analyzer.py             # Aggregations, wasted cost, severity-graded findings
+│   │   ├── analyzer.py             # Energy, IPD/IPW, aggregations, wasted cost, severity findings
 │   │   └── comparator.py           # Trace comparison engine & regression diffing
-│   ├── pricing/                    # Pricing Engine
+│   ├── pricing/                    # Pricing & Electrical Energy Engine
 │   │   ├── defaults.py             # Built-in model rates (OpenAI, Anthropic, Gemini, Llama)
-│   │   └── engine.py               # Custom YAML loader, token pricing, infra amortization
-│   ├── exporters/                  # Telemetry Exporters
-│   │   ├── json_export.py          # Raw JSON trace serializer
-│   │   └── otel_export.py          # OpenTelemetry OTLP-compliant JSON exporter
+│   │   ├── energy.py               # Hardware accelerator power draw (TDP), Joules, kWh, IPD, IPW
+│   │   └── engine.py               # Integrated token + infra + energy cost calculator
+│   ├── routing/                    # Eval-Driven Routing & The Efficient Frontier of AI
+│   │   ├── frontier.py             # Multi-dimensional Pareto optimal frontier calculator
+│   │   └── eval_router.py          # Tier-based routing policy & background shadow testing
+│   ├── resilience/                 # AI Disaster Recovery & The AI Breaker Box
+│   │   ├── breaker.py              # Circuit breakers (CLOSED, OPEN, HALF_OPEN) for AI providers
+│   │   ├── semantic_mapper.py      # Schema & prompt translator (OpenAI, Anthropic, Gemini, Local)
+│   │   └── dr_drills.py            # Automated synthetic Disaster Recovery drills & continuity audits
+│   ├── incident/                   # AI-Aware Causal Incident Graph
+│   │   └── graph.py                # Discrete causal graph linking silicon & fabric stalls to waste
+│   ├── server/                     # Executive Command Center Web UI & REST APIs
+│   │   └── __init__.py             # Multi-tab Executive Command Center, Pareto visualizer, REST API
 │   ├── cli/                        # Rich Terminal CLI
-│   │   ├── main.py                 # Typer application (doctor, run, report, compare, demo)
-│   │   └── formatting.py           # Rich panels, DAG tree builders, colorized severity tags
+│   │   ├── main.py                 # Typer app (doctor, run, report, compare, metrics, frontier, dr, breaker)
+│   │   └── formatting.py           # Rich panels, Pareto tables, DR drill scorecards, DAG trees
 │   └── utils/                      # Utilities
 │       └── time_utils.py           # Sub-millisecond timing, ISO formatters, currency formatting
 ├── examples/                       # Executable Examples & AI Workload Laboratory

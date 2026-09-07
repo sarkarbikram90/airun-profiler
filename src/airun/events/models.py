@@ -64,6 +64,11 @@ class TraceSpan(BaseModel):
     retry_count: int = 0
     quality_score: Optional[float] = None
     evaluation_metrics: Dict[str, Any] = Field(default_factory=dict)
+    accelerator_type: Optional[str] = None
+    power_watts: Optional[float] = None
+    energy_joules: Optional[float] = None
+    energy_kwh: Optional[float] = None
+    energy_cost_usd: Optional[float] = None
     error: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
@@ -87,6 +92,15 @@ class TraceSummary(BaseModel):
     cost_per_successful_outcome_usd: Optional[float] = None
     quality_score: Optional[float] = None
     evaluation_metrics: Dict[str, Any] = Field(default_factory=dict)
+    total_energy_joules: float = 0.0
+    total_energy_kwh: float = 0.0
+    total_energy_cost_usd: float = 0.0
+    intelligence_per_dollar: Optional[float] = None
+    intelligence_per_watt: Optional[float] = None
+    tokens_per_dollar: Optional[float] = None
+    tokens_per_kwh: Optional[float] = None
+    cluster_utilization_pct: Optional[float] = None
+    effective_utilization_pct: Optional[float] = None
     total_tokens: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
