@@ -197,6 +197,42 @@ airun compare previous latest
 | `airun export [latest\|<id>] --format [json\|otel-json]` | Export trace in raw JSON or OpenTelemetry format |
 | `airun ui` / `airun serve` | Launch interactive Command Center Web UI and REST API |
 
+---
+
+## Production Architecture & 3-Phase Evolution
+
+`airun` bridges developer runtime profiling and cloud-scale AI infrastructure optimization across three planned evolutionary phases:
+
+```text
+                    AIRUN
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+      CONTROL PLANE             DATA PLANE
+          │                         │
+     TypeScript                  Rust
+          │                         │
+          │             ┌───────────┼───────────┐
+          │             │           │           │
+          │         Collector   Processor   Scheduler
+          │             │           │           │
+          └─────────────┴───── Pub/Sub ─────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                PostgreSQL              Python
+             State & Decisions        Analytics/ML
+                    │                       │
+                    └───────────┬───────────┘
+                                │
+                              GKE
+```
+
+### The 3 Evolutionary Phases
+- **Phase 1 — Developer Platform (Current)**: Local-first Python SDK & CLI (`@trace`, `airun report`, `airun compare`, `airun waste`, `airun frontier`) with microsecond overhead and zero network dependencies.
+- **Phase 2 — Cloud Control Plane**: Multi-tenant SaaS control plane featuring GKE GPU DaemonSet collector (`deploy/kubernetes/daemonset-agent.yaml`), Pub/Sub event backbone, and PostgreSQL for state & decisions (`deploy/postgres/schema.sql`).
+- **Phase 3 — Infrastructure Intelligence**: Closed autonomic product loop:
+  $$\text{Observe} \longrightarrow \text{Understand} \longrightarrow \text{Measure Economics} \longrightarrow \text{Find Waste} \longrightarrow \text{Recommend Optimization} \longrightarrow \text{Remediate} \longrightarrow \text{Learn}$$
 
 ---
 
