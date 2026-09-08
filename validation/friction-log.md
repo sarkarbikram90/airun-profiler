@@ -1,9 +1,9 @@
-# External User Friction Log
+# External User Friction Log Template
 
-Use this log to track usability stumbling blocks, unexpected errors, and requested integrations during user onboarding.
+Use this template to record usability stumbling blocks, unexpected errors, and requested integrations during live user onboarding sessions.
+
+> Historical and aggregated entries are cataloged in [`validation/results/friction-log.md`](results/friction-log.md).
 
 | Date | User / Org | Workload Description | Friction Point / Failure Mode | Severity (P0/P1/P2) | Action Taken / Scheduled Fix |
 |---|---|---|---|---|---|
-| 2026-08-29 | Internal Lab | 5 Parallel Tool Agents | Sibling spans needed interval DAG critical path resolution | P0 | Fixed in v0.1.1 |
-| | | | | | |
-| | | | | | |
+| YYYY-MM-DD | [User / Org] | [Workload description] | [Observed failure or confusion] | P0 / P1 / P2 | [Resolution or task ID] |

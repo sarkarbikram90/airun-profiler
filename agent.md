@@ -28,7 +28,7 @@ Observe → Explain → Optimize → Control → Automate
 
 ```text
 airun-tracing/
-├── src/airun/                      # Core Package (18 modules, 83% test coverage)
+├── src/airun/                      # Core Python Package (93 tests, 100% passing)
 │   ├── __init__.py                 # Top-level exports: trace, SpanKind, calculate_energy, EvalRouter, etc.
 │   ├── __main__.py                 # CLI entrypoint for 'python -m airun'
 │   ├── config.py                   # Pydantic configuration loader (.airun/config.yaml)
@@ -37,8 +37,10 @@ airun-tracing/
 │   │   ├── context.py              # ContextVar-based trace & span stack management
 │   │   ├── redaction.py            # Automatic API key & secret redaction engine
 │   │   └── wrappers.py             # Client wrappers (OpenAI client auto-instrumentation)
-│   ├── events/                     # Data Models
-│   │   └── models.py               # TraceSpan, TraceSummary (with Energy, IPD, IPW telemetry)
+│   ├── events/                     # Data Models & Distributed Pub/Sub
+│   │   ├── models.py               # TraceSpan, TraceSummary, GoldenSignals, DCGMSample
+│   │   ├── pubsub.py               # Standardized 10-event distributed pub/sub backbone
+│   │   └── queue.py                # In-memory async event queue & subscribers
 │   ├── store/                      # Persistence Layer
 │   │   ├── base.py                 # Abstract TraceStore interface
 │   │   ├── sqlite.py               # Local SQLite store with WAL mode & prefix queries
@@ -48,7 +50,10 @@ airun-tracing/
 │   │   └── critical_path.py        # Interval dynamic programming critical-path calculator
 │   ├── analysis/                   # Economic & Diagnostic Intelligence
 │   │   ├── analyzer.py             # Energy, IPD/IPW, aggregations, wasted cost, severity findings
-│   │   └── comparator.py           # Trace comparison engine & regression diffing
+│   │   ├── comparator.py           # Trace comparison engine & regression diffing
+│   │   ├── correlation.py          # Time-window correlation linking spans to GPU silicon stalls
+│   │   ├── pipeline.py             # End-to-end distributed pipeline validation
+│   │   └── waste.py                # Silicon waste, MFU, and financial bleed engine
 │   ├── pricing/                    # Pricing & Electrical Energy Engine
 │   │   ├── defaults.py             # Built-in model rates (OpenAI, Anthropic, Gemini, Llama)
 │   │   ├── energy.py               # Hardware accelerator power draw (TDP), Joules, kWh, IPD, IPW
@@ -62,17 +67,33 @@ airun-tracing/
 │   │   └── dr_drills.py            # Automated synthetic Disaster Recovery drills & continuity audits
 │   ├── incident/                   # AI-Aware Causal Incident Graph
 │   │   └── graph.py                # Discrete causal graph linking silicon & fabric stalls to waste
+│   ├── exporters/                  # Telemetry Exporters
+│   │   ├── json_export.py          # Structured JSON exporter
+│   │   ├── otel_export.py          # OpenTelemetry 1.0 format with GenAI semantic attributes
+│   │   └── otlp.py                 # Direct OTLP/HTTP client exporter
 │   ├── server/                     # Executive Command Center Web UI & REST APIs
 │   │   └── __init__.py             # Multi-tab Executive Command Center, Pareto visualizer, REST API
 │   ├── cli/                        # Rich Terminal CLI
 │   │   ├── main.py                 # Typer app (doctor, run, report, compare, metrics, frontier, dr, breaker)
-│   │   └── formatting.py           # Rich panels, Pareto tables, DR drill scorecards, DAG trees
+│   │   ├── formatting.py           # Rich panels, Pareto tables, DR drill scorecards, DAG trees
+│   │   └── pipeline.py             # End-to-end pipeline CLI commands
 │   └── utils/                      # Utilities
 │       └── time_utils.py           # Sub-millisecond timing, ISO formatters, currency formatting
+├── crates/                         # Rust Data Plane
+│   └── airun-collector/            # Sub-millisecond DaemonSet with DCGM/NVML 10Hz ring buffer & OTLP (:4318)
+├── packages/                       # Polyglot Packages & Services
+│   └── control-plane/              # TypeScript / Express Control Plane with PostgreSQL state contracts
+├── deploy/                         # Production Infrastructure Deployment
+│   ├── kubernetes/                 # DaemonSet agent, PVC, Service, and Ingress manifests
+│   ├── helm/airun-data-plane/      # Production Helm v3 chart
+│   └── compose/docker-compose.yml  # Multi-service local lab orchestration
 ├── examples/                       # Executable Examples & AI Workload Laboratory
 │   ├── simple_workflow.py          # Basic linear workflow
 │   ├── agent_with_tools.py         # Multi-step agent with parallel tools
 │   ├── failing_workflow.py         # Injected failure with wasted cost demonstration
+│   ├── energy_and_power_profiling.py # H100 TDP power profiling and Intelligence per Watt metrics
+│   ├── eval_routed_workflow.py     # Eval-driven routing and shadow testing
+│   ├── disaster_recovery_drill.py  # Fault injection, AI Breaker trip, and semantic failover
 │   └── lab/                        # AI Workload Laboratory (10 Economic Archetypes)
 │       ├── chat_workload.py        # Archetype 1: Simple LLM Assistant
 │       ├── rag_workload.py         # Archetype 2: RAG Retrieval & Synthesis
@@ -81,20 +102,18 @@ airun-tracing/
 │       ├── multi_agent_workload.py # Archetype 5: Multi-Agent Synthesis Pipeline
 │       ├── comparison_workload.py  # Archetype 6: Cost & Latency Regression Lab
 │       └── run_all.py              # Batch runner for cross-archetype comparative table
-├── tests/                          # 38 Passing Unit, Integration, and Benchmark Tests
+├── tests/                          # 93 Passing Unit, Integration, and Benchmark Tests
 │   ├── unit/                       # Models, graph DAG, pricing, analyzer, redaction, store
-│   ├── integration/                # CLI commands, doctor, demo, trace-id-file, OTel exports
+│   ├── integration/                # CLI commands, doctor, demo, trace-id-file, OTel exports, pubsub
 │   └── benchmarks/                 # Micro-overhead validation (<20µs in-memory, <1ms disk)
 ├── validation/                     # External Validation & Discovery Kit (AIRUN-100)
 │   ├── AIRUN-100.md                # Milestone charter, archetype matrix, operating rules
 │   ├── invitation.md               # Zero-pitch outreach message template
 │   ├── quickstart-checklist.md     # 4-step onboarding checklist (< 3 minutes)
 │   ├── feedback-form.md            # 9-point feedback form with counterfactual questions
-│   ├── sample-workloads/           # 4 standalone user test scripts
 │   └── results/                    # Campaign tracking: users.md, friction-log.md, pain-ranking.md
-├── pyproject.toml                  # Packaging specification (airun-profiler 0.1.1)
+├── pyproject.toml                  # Packaging specification (airun-profiler 0.1.4)
 ├── Dockerfile                      # Self-contained container environment
-├── docker-compose.yml              # Multi-container lab composition
 └── Makefile                        # Standard developer targets (test, lint, lab, doctor)
 ```
 
@@ -116,20 +135,20 @@ Instrumentation code must **never** crash or disrupt the host application.
 
 ### Rule 3: Privacy by Default
 - Prompt text and completion contents are **never** recorded unless explicitly configured.
-- Sensitive keys (`api_key`, `authorization`, `token`, `bearer`, `password`, `secret`) are automatically redacted via recursive masking in [`src/airun/sdk/redaction.py`](file:///c:/Users/bikrams/airun-tracing/airun-tracing/src/airun/sdk/redaction.py).
+- Sensitive keys (`api_key`, `authorization`, `token`, `bearer`, `password`, `secret`) are automatically redacted via recursive masking in [`src/airun/sdk/redaction.py`](src/airun/sdk/redaction.py).
 
 ### Rule 4: Windows Console ASCII Compatibility
 - Console formatters must strictly use ASCII-safe status tags (`[OK]`, `[!]`, `[INFO]`, `*`) rather than raw Unicode emojis to prevent `cp1252` encoding crashes on Windows cmd/PowerShell.
 
 ### Rule 5: True Directed Acyclic Graph (DAG) Execution Model
 - Traces model parallel executions using reciprocal linkages (`parents`, `children`, `parent_ids`, `child_ids`).
-- Concurrency speedups and critical-path durations are computed using interval scheduling dynamic programming in [`src/airun/graph/critical_path.py`](file:///c:/Users/bikrams/airun-tracing/airun-tracing/src/airun/graph/critical_path.py).
+- Concurrency speedups and critical-path durations are computed using interval scheduling dynamic programming in [`src/airun/graph/critical_path.py`](src/airun/graph/critical_path.py).
 
 ---
 
 ## 4. Key Models & Diagnostic Concepts
 
-### 1. `TraceSpan` & `TraceSummary` ([`src/airun/events/models.py`](file:///c:/Users/bikrams/airun-tracing/airun-tracing/src/airun/events/models.py))
+### 1. `TraceSpan` & `TraceSummary` ([`src/airun/events/models.py`](src/airun/events/models.py))
 - **`wasted_cost_usd`**: 100% of total spend for failed/timeout workflows; cost of failed steps for partial successes.
 - **`cost_per_successful_outcome_usd`**: Total spend attributed only to successful completions.
 - **`quality_score`** (0.0 to 1.0) & **`evaluation_metrics`** (dict): Evaluation provenance tracking to prove economic optimizations preserve outcome quality.
@@ -228,8 +247,8 @@ async with trace("agent_workflow", kind=SpanKind.WORKFLOW):
 
 During the validation campaign, follow these rules:
 1. **Feature Freeze**: No new speculative features. Only validation-blocking defect fixes.
-2. **Record Every Friction Point**: Log all setup, concept, trust, and action friction in [`validation/results/friction-log.md`](file:///c:/Users/bikrams/airun-tracing/airun-tracing/validation/results/friction-log.md).
-3. **Capture Existing Workarounds**: In [`validation/results/pain-ranking.md`](file:///c:/Users/bikrams/airun-tracing/airun-tracing/validation/results/pain-ranking.md), document what teams currently do (e.g. custom scripts, billing alerts, regex message pruning).
+2. **Record Every Friction Point**: Log all setup, concept, trust, and action friction in [`validation/results/friction-log.md`](validation/results/friction-log.md).
+3. **Capture Existing Workarounds**: In [`validation/results/pain-ranking.md`](validation/results/pain-ranking.md), document what teams currently do (e.g. custom scripts, billing alerts, regex message pruning).
 4. **Rank Opportunities Using 4D Formula**:
    $$\text{Opportunity Score} = \text{Frequency} \times \text{Severity} \times \text{Willingness to Pay} \times \text{Technical Feasibility}$$
 5. **Probe the "So What?" Question**: For every finding, discover whether the engineer *acted*, *couldn't fix*, or *ignored*.

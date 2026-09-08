@@ -1,44 +1,47 @@
-# 12-Month Post-MVP Evolution Roadmap
+# Post-MVP Evolution Roadmap
 
-Following the progression ladder:
+Following the strategic progression ladder:
 ```text
 Observe → Explain → Optimize → Control → Automate
 ```
 
 ---
 
-## Months 1–2: Foundation & Runtime Fluency (MVP - Current)
-- [x] Python SDK with `@trace` and `with trace()`
-- [x] Local SQLite / JSONL trace store
-- [x] Directed execution graph & critical path analysis
-- [x] Pricing engine & top cost drivers calculation
-- [x] Terminal report & run comparator
-- [x] OpenTelemetry OTLP JSON export
-- [x] Deterministic fixtures & benchmark tests
+## Phase 1: Foundation & Observability (v0.1.0 – v0.1.2) — COMPLETED
+- [x] Python SDK with `@trace` and `with trace()` (<20µs in-memory overhead)
+- [x] Local SQLite / JSONL trace store with WAL mode
+- [x] Directed execution graph (DAG) & interval critical-path analysis
+- [x] Multi-provider token pricing engine (OpenAI, Anthropic, Gemini, Local)
+- [x] Severity-graded terminal reports & side-by-side run comparator (`airun compare`)
+- [x] OpenTelemetry 1.0 OTLP JSON export
+- [x] Deterministic fixtures & benchmark test suite
 
 ---
 
-## Months 3–4: Explain Layer & External Validation
-- Direct LangChain, LlamaIndex, LiteLLM, and CrewAI auto-instrumentation packages.
-- Root-cause anomaly detection (flagging token runaway loops, retry cascades).
-- Community pilot with 20 production AI engineering teams.
+## Phase 2: AI Infrastructure Reliability & Economics Platform (v0.1.3 – v0.1.4) — COMPLETED
+- [x] **Rust Real-Time Data Plane (`crates/airun-collector`)**: High-throughput DaemonSet with 10Hz ring buffer, OTLP ingestion (`:4318`), and NVIDIA DCGM/NVML metric scraping.
+- [x] **Hardware Economics & Energy Engine**: Intelligence per Dollar (IPD), Intelligence per Watt (IPW), and PUE 1.20 data center thermal modeling across H100, A100, B200, TPU v5e, and MI300X.
+- [x] **Physics of AI Waste & MFU Engine**: Identification of the 4 canonical stalls (Dataloader, NCCL, PCIe, Eager mode) and Real-Time Financial Bleed ($/hr).
+- [x] **The Efficient Frontier & Eval-Driven Routing**: Multi-dimensional Pareto optimal frontier and continuous background shadow testing.
+- [x] **The AI Breaker Box & Automated Disaster Recovery (DR)**: 3-state circuit breakers, Semantic Equivalence Mapping across model dialects, and synthetic continuity drills.
+- [x] **AI-Aware Causal Incident Graph**: Discrete root-cause graph linking physical hardware stalls to financial compute loss.
+- [x] **Standardized 10-Event Pub/Sub Backbone**: Cross-service event envelopes unifying Python, Rust, and TypeScript.
+- [x] **TypeScript Control Plane & PostgreSQL Integration (`packages/control-plane`)**: Commercial wedge REST API endpoints and remediation dispatch.
+- [x] **Executive Command Center Dashboard (`airun ui`)**: Multi-tab live interface with Pareto visualization, golden signals, and DR simulation.
+- [x] **Production Deployment Artifacts**: Kubernetes GKE/EKS manifests, Helm v3 charts, and Docker Compose testbed.
 
 ---
 
-## Months 5–6: Optimize Layer
-- Automated model downgrading suggestions (identifying non-critical spans suitable for smaller models).
-- Prompt caching potential analysis (predicting savings from OpenAI/Anthropic prompt prefix caching).
-- Static HTML report generator (`airun report <id> --html`).
+## Phase 3: Distributed Agent Fleets & Cluster Autonomics (v0.2.0)
+- [ ] **eBPF Network Fabric Tracing**: Kernel-level RoCE/InfiniBand packet loss detection and NCCL buffer queue inspection.
+- [ ] **Multi-Cluster Federation**: Centralized control-plane state aggregation across hybrid clouds (AWS EKS + GCP GKE + on-premise GPU clusters).
+- [ ] **Automated Remediation Loop**: Autonomic worker scaling, automated `torch.compile` injection, and dynamic batch size tuning.
+- [ ] **Prompt Prefix Cache Optimizer**: Predictive ROI modeling for OpenAI and Anthropic prefix cache hits.
+- [ ] **LangChain, LlamaIndex, CrewAI, and AutoGen Native Hooks**: Zero-code automatic callback instrumentation.
 
 ---
 
-## Months 7–9: Control Layer
-- Request interception sidecar / proxy mode.
-- Dynamic cost budget enforcer (terminating agent loops when cost limit is reached).
-- Retry circuit breakers.
-
----
-
-## Months 10–12: Team & Commercial Platform
-- Self-hosted team server & centralized trace aggregator.
-- Multi-user RBAC and enterprise compliance auditing.
+## Phase 4: Enterprise Commercial Platform (v0.3.0+)
+- [ ] Multi-tenant RBAC with SSO/SAML authentication.
+- [ ] FinOps budget allocation & chargeback tagging by business unit/team.
+- [ ] SOC2 Type II compliance audit logs and cryptographic trace attestations.

@@ -57,7 +57,7 @@ $$\text{Application / Domain} \times \text{Execution Strategy / Architecture} \t
 ## 5. Four Operating Rules During AIRUN-100
 
 1. **Feature Freeze**: No new capability development until 100 workloads and 20 interviews are synthesized. Only validation-blocking defect fixes are permitted.
-2. **Friction is Ground Truth**: Record every hesitation, pause, terminal error, or conceptual confusion in [`validation/results/friction-log.md`](file:///c:/Users/bikrams/airun-tracing/airun-tracing/validation/results/friction-log.md).
+2. **Friction is Ground Truth**: Record every hesitation, pause, terminal error, or conceptual confusion in [`validation/results/friction-log.md`](results/friction-log.md).
 3. **Counterfactual Listening**: Always ask:
    - *"If airun disappeared tomorrow, what would you use instead?"*
    - *"If airun disappeared tomorrow, what specific capability or insight would you lose?"*

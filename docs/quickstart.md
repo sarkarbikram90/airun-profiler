@@ -16,18 +16,22 @@ pip install airun-profiler
 Or from source:
 
 ```bash
-git clone https://github.com/your-org/airun-tracing.git
+git clone https://github.com/sarkarbikram90/airun-tracing.git
 cd airun-tracing
 pip install -e .
 ```
 
 ---
 
-## 2. Instant Demo (Zero Setup)
+## 2. Instant Demo & Health Check (Zero Setup)
 
-Run the built-in simulated agent workflow without external API keys:
+Run the environment health check and simulated agent workflow without external API keys:
 
 ```bash
+# Verify SQLite WAL mode and local environment
+airun doctor
+
+# Run instant offline demo trace
 airun demo
 ```
 
@@ -70,30 +74,58 @@ with trace("customer_agent", kind=SpanKind.WORKFLOW) as root:
 
 ---
 
-## 4. CLI Inspection Commands
+## 4. CLI Inspection & Platform Commands
 
-### List Captured Traces
+### Basic Tracing & Reports
 ```bash
+# List captured traces
 airun trace list
-```
 
-### Inspect Trace Spans & Tree
-```bash
-airun trace show <trace_id>
-```
+# Inspect execution hierarchy
+airun trace show latest
 
-### Generate Detailed Report
-```bash
-airun report <trace_id>
-```
+# Generate detailed report with severity findings
+airun report latest
 
-### Compare Two Runs (Regression Detection)
-```bash
+# Compare two runs side-by-side (regression detection)
 airun compare <baseline_trace_id> <optimized_trace_id>
+
+# Export trace to OpenTelemetry OTLP JSON
+airun export latest --format otel-json --output otel_trace.json
 ```
 
-### Export Trace (JSON or OpenTelemetry)
+### Executive Command Center Web UI
 ```bash
-airun export <trace_id> --format json --output trace.json
-airun export <trace_id> --format otel-json --output otel_trace.json
+# Launch interactive local web dashboard on http://localhost:8080
+airun ui --port 8080
+```
+
+### Physics of AI Waste & Financial Bleed
+```bash
+# Analyze hardware stalls (Dataloader starvation, NCCL stalls, PCIe saturation, eager dispatch)
+airun waste --hardware
+
+# Inspect multi-agent spend attribution and model optimization deltas
+airun waste --workload
+```
+
+### The Efficient Frontier & Eval Routing
+```bash
+# Render Pareto-optimal frontier table across Quality, Cost, and Latency
+airun frontier
+```
+
+### AI Breaker Box & Disaster Recovery (DR)
+```bash
+# Check live circuit breaker states across AI providers
+airun breaker status
+
+# Run synthetic disaster recovery failover drill
+airun dr drill
+```
+
+### Distributed Pipeline Verification
+```bash
+# Validate complete 6-tier distributed data pipeline
+airun pipeline run
 ```
