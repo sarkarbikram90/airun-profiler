@@ -127,9 +127,9 @@ def bump_versions(version: str) -> None:
         f'badge/version-{version}-blue.svg',
     )
 
-    # 11. agent.md
+    # 11. AGENT.md
     update_file(
-        ROOT / "agent.md",
+        ROOT / "AGENT.md",
         r'- \*\*v[^\s]+ \(Current\)\*\*',
         f'- **v{version} (Current)**',
     )

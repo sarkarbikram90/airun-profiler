@@ -366,8 +366,8 @@ python examples/lab/run_all.py
   - [Azure Kubernetes Service (Azure AKS) Deployment Guide](docs/azure-aks-deployment-guide.md)
 - **Technical Architecture & Specifications**:
   - [System Architecture & Distributed Data Path](docs/architecture.md)
-  - [Master Product Specification (`spec.md`)](spec.md)
-  - [Developer & AI Agent Guide (`agent.md`)](agent.md)
+  - [Master Product Specification (`SPECIFICATION.md`)](SPECIFICATION.md)
+  - [Developer & AI Agent Guide (`AGENT.md`)](AGENT.md)
   - [5-Minute Quickstart Guide](docs/quickstart.md)
   - [Pricing & Accelerator Energy Economics](docs/pricing.md)
   - [Architecture Decision Records (ADRs)](docs/decision-log.md)

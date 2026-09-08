@@ -1,7 +1,7 @@
 """Built-in lightweight Web Server and REST API for airun profiler.
 
 Serves an interactive AI Infrastructure Command Center and REST APIs directly from the local SQLite trace store.
-Implements the spec.md Executive Command Center, Efficient Frontier visualizer, AI Breaker Box, and Causal Incident Graph.
+Implements the SPECIFICATION.md Executive Command Center, Efficient Frontier visualizer, AI Breaker Box, and Causal Incident Graph.
 """
 
 import json
@@ -146,7 +146,7 @@ class AirunServerHandler(BaseHTTPRequestHandler):
             )
             return
 
-        # API: Executive AI Infrastructure Command Center Metrics (spec.md lines 739-766)
+        # API: Executive AI Infrastructure Command Center Metrics (SPECIFICATION.md lines 739-766)
         if path == "/api/metrics/executive":
             store = get_trace_store()
             summaries = store.list_traces(limit=500)
@@ -157,7 +157,7 @@ class AirunServerHandler(BaseHTTPRequestHandler):
                 getattr(s, "total_energy_cost_usd", 0.0) or 0.0 for s in summaries
             )
 
-            # Baseline demonstration values matching the spec.md Executive Command Center
+            # Baseline demonstration values matching the SPECIFICATION.md Executive Command Center
             compute_cost = 184291.0 if total_cost == 0.0 else round(total_cost, 2)
             energy_cost = 31882.0 if total_energy_cost == 0.0 else round(total_energy_cost, 2)
             wasted_compute = 27410.0 if wasted_cost == 0.0 else round(wasted_cost, 2)
@@ -526,7 +526,7 @@ def get_dashboard_html() -> str:
       padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Executive KPI Grid (spec.md lines 739-766) */
+    /* Executive KPI Grid (SPECIFICATION.md lines 739-766) */
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
     .kpi-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
@@ -657,7 +657,7 @@ def get_dashboard_html() -> str:
       </div>
     </header>
 
-    <!-- Top Problem Banner (spec.md lines 757-766) -->
+    <!-- Top Problem Banner (SPECIFICATION.md lines 757-766) -->
     <div class="banner-alert" id="banner-problem">
       <div class="banner-content">
         <span class="banner-tag">TOP INCIDENT</span>
@@ -668,7 +668,7 @@ def get_dashboard_html() -> str:
       <div class="banner-savings" id="banner-savings">Projected savings: $11,800 / day</div>
     </div>
 
-    <!-- Executive KPI Grid (spec.md lines 742-755) -->
+    <!-- Executive KPI Grid (SPECIFICATION.md lines 742-755) -->
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-title">Compute Cost</div>
@@ -758,7 +758,7 @@ def get_dashboard_html() -> str:
       </div>
     </div>
 
-    <!-- Tab 2: The Efficient Frontier of AI (spec.md lines 938-946) -->
+    <!-- Tab 2: The Efficient Frontier of AI (SPECIFICATION.md lines 938-946) -->
     <div id="tab-frontier" class="tab-content">
       <div class="panel">
         <div class="panel-header">
@@ -792,7 +792,7 @@ def get_dashboard_html() -> str:
       </div>
     </div>
 
-    <!-- Tab 3: AI Breaker Box & Disaster Recovery (spec.md lines 948-962) -->
+    <!-- Tab 3: AI Breaker Box & Disaster Recovery (SPECIFICATION.md lines 948-962) -->
     <div id="tab-dr" class="tab-content">
       <div class="panel" style="margin-bottom:24px;">
         <div class="panel-header">
@@ -822,7 +822,7 @@ def get_dashboard_html() -> str:
       </div>
     </div>
 
-    <!-- Tab 4: AI Causal Incident Graph (spec.md lines 353-375) -->
+    <!-- Tab 4: AI Causal Incident Graph (SPECIFICATION.md lines 353-375) -->
     <div id="tab-incident" class="tab-content">
       <div class="panel">
         <div class="panel-header">

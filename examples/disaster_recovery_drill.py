@@ -1,6 +1,6 @@
 """Example: AI Disaster Recovery (DR) Drill and Business Continuity Failover.
 
-Demonstrates the implementation of spec.md:
+Demonstrates the implementation of SPECIFICATION.md:
 "Multi-model / multi-provider AI business continuity:
 Can workload X run on provider Y?
 What capabilities are lost? What's the quality delta? What's the cost? What's the latency?

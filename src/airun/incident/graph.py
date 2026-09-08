@@ -1,6 +1,6 @@
 """AI-Aware Causal Incident Graph Engine.
 
-Implements the spec.md requirement:
+Implements the SPECIFICATION.md requirement:
 "The wedge isn't 'we monitor GPUs'—it's 'we understand the causal graph of AI failures.'
 Your 'AI-aware incident graph' concept is the real differentiator:
 Training job -> Pod eviction -> GPU Xid error -> PCIe degradation -> Node failure ->

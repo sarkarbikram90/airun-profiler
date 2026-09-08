@@ -1,4 +1,4 @@
-"""Integration tests for spec.md CLI commands: metrics, frontier, dr drill, breaker status."""
+"""Integration tests for SPECIFICATION.md CLI commands: metrics, frontier, dr drill, breaker status."""
 
 from typer.testing import CliRunner
 

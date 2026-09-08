@@ -1,6 +1,6 @@
 """Eval-Driven Routing Engine for AI Workloads.
 
-Implements the specification from spec.md:
+Implements the specification from SPECIFICATION.md:
 "The Solution: Eval-Driven Routing
 airun cannot just be Datadog; it must integrate with LLMOps evaluation frameworks.
 1. The Baseline: The customer defines a 'Quality Score' (e.g., 95% pass rate on an eval dataset).

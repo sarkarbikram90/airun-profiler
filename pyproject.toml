@@ -61,7 +61,7 @@ Documentation = "https://github.com/sarkarbikram90/airun-tracing#readme"
 Repository = "https://github.com/sarkarbikram90/airun-tracing"
 "Issue Tracker" = "https://github.com/sarkarbikram90/airun-tracing/issues"
 Changelog = "https://github.com/sarkarbikram90/airun-tracing/blob/main/CHANGELOG.md"
-Specification = "https://github.com/sarkarbikram90/airun-tracing/blob/main/spec.md"
+Specification = "https://github.com/sarkarbikram90/airun-tracing/blob/main/SPECIFICATION.md"
 
 [project.optional-dependencies]
 dev = [

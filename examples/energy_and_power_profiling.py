@@ -1,6 +1,6 @@
 """Example: Hardware Accelerator Power, Energy, and Intelligence per Watt Profiling.
 
-Demonstrates the implementation of spec.md:
+Demonstrates the implementation of SPECIFICATION.md:
 "The killer metric: Intelligence per Dollar (IPD) and Intelligence per Watt (IPW):
 IPD = useful task output / (compute + energy + infrastructure cost)
 IPW = useful task output / energy (kWh)

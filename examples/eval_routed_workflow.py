@@ -1,6 +1,6 @@
 """Example: Eval-Driven Routing and Efficient Frontier Optimization.
 
-Demonstrates the implementation of spec.md:
+Demonstrates the implementation of SPECIFICATION.md:
 "The Solution: Eval-Driven Routing
 1. The Baseline: The customer defines a 'Quality Score' (e.g. 95% pass rate).
 2. The Shadow Test: airun continuously routes a small percentage of live traffic

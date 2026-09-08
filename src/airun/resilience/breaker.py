@@ -1,6 +1,6 @@
 """The AI Breaker Box: Resilient Circuit Breakers for AI Model Providers.
 
-Implements the spec.md requirement:
+Implements the SPECIFICATION.md requirement:
 "The 'AI Breaker' Box:
 Just like a circuit breaker in software prevents cascading failures,
 airun detects when an LLM is hallucinating, timing out, or failing and

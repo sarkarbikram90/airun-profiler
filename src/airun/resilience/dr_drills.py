@@ -4,7 +4,7 @@ Simulates catastrophic provider failures, latency degradation, or silent quality
 triggers the AI Breaker Box, executes failovers using Semantic Equivalence Mapping,
 and generates empirical Business Continuity Audits.
 
-Implements the spec.md requirement:
+Implements the SPECIFICATION.md requirement:
 "Multi-model / multi-provider AI business continuity:
 Can workload X run on provider Y?
 What capabilities are lost? What's the quality delta? What's the cost? What's the latency?

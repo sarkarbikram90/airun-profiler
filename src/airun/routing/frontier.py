@@ -5,7 +5,7 @@ Computes the Pareto-optimal frontier of AI models balancing:
 2. Cost (Blended USD per 1M tokens)
 3. Latency (Typical end-to-end response time in ms)
 
-Implements the spec.md requirement:
+Implements the SPECIFICATION.md requirement:
 "The dashboard doesn't just show cost; it shows the Efficient Frontier of AI:
 - Model A: $10/M tokens, 99% Quality
 - Model B: $2/M tokens, 96% Quality

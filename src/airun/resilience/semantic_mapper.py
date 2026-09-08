@@ -4,7 +4,7 @@ Translates prompts, system instructions, function/tool schemas, and generation p
 across AI providers (OpenAI, Anthropic, Google Gemini, Ollama/vLLM) so automated failovers
 execute seamlessly without breaking caller applications.
 
-Implements the spec.md requirement:
+Implements the SPECIFICATION.md requirement:
 "Semantic Equivalence Mapping: If Provider A goes down, airun doesn't just switch to
 Provider B. It translates the system prompts, adjusts the temperature, and reformats
 the tool-calling schemas to ensure Provider B behaves exactly like Provider A."
