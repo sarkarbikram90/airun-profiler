@@ -6,8 +6,8 @@ Thank you for your interest in contributing to `airun`!
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/sarkarbikram90/airun-tracing.git
-   cd airun-tracing
+   git clone https://github.com/sarkarbikram90/airun-profiler.git
+   cd airun-profiler
    ```
 
 2. **Python SDK & CLI Setup**:

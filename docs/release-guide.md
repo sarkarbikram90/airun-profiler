@@ -29,7 +29,7 @@ When tag `v*.*.*` is pushed to GitHub, [`.github/workflows/release.yml`](../.git
 1. **Builds Wheel & SDist**: Builds Python `.whl` and `.tar.gz` distribution packages.
 2. **Publishes to PyPI**: Uploads the packages to PyPI (via PyPI Trusted Publishing or `PYPI_API_TOKEN`).
 3. **Creates GitHub Release**: Automatically publishes an official GitHub Release with release notes and attaches the built `.whl` and `.tar.gz` assets.
-4. **Publishes Docker Image**: Builds the multi-stage Docker container and publishes `ghcr.io/sarkarbikram90/airun-tracing:v0.1.4` and `:latest` to GitHub Packages.
+4. **Publishes Docker Image**: Builds the multi-stage Docker container and publishes `ghcr.io/sarkarbikram90/airun-profiler:v0.1.4` and `:latest` to GitHub Packages.
 
 ---
 
@@ -45,7 +45,7 @@ Trusted Publishing uses OpenID Connect (OIDC) between GitHub and PyPI, eliminati
 2. Under **"Add a publisher"**, select **"GitHub"**.
 3. Fill in:
    - **Owner**: `sarkarbikram90`
-   - **Repository name**: `airun-tracing`
+   - **Repository name**: `airun-profiler`
    - **Workflow name**: `release.yml`
    - **Environment name**: *(leave blank)*
 4. Click **"Add publisher"**.

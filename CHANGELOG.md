@@ -72,7 +72,7 @@ All notable changes to `airun` are documented in this file.
   - AWS Application Load Balancer (ALB) and AWS EBS `gp3` persistent volume configuration.
   - Step-by-step deployment guide in `docs/aws-eks-deployment-guide.md`.
 - **GitHub Container Registry (GHCR) Packages Automation**:
-  - Multi-stage Docker image automated publishing to `ghcr.io/sarkarbikram90/airun-tracing`.
+  - Multi-stage Docker image automated publishing to `ghcr.io/sarkarbikram90/airun-profiler`.
   - Future release and publishing runbook in `docs/release-guide.md`.
 
 ## [0.1.1] - 2026-08-29

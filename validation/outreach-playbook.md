@@ -36,8 +36,8 @@ We benchmarked a multi-step research agent before and after profiling. By conver
 **We're doing 5 free pipeline teardowns**:
 If you're running multi-step agents in staging or production, run 5 traces through `airun run` and I'll personally send you back a custom execution graph teardown showing your critical-path bottlenecks and wasted spend.
 
-GitHub: https://github.com/sarkarbikram90/airun-tracing
-Docs & Lab: https://github.com/sarkarbikram90/airun-tracing#readme
+GitHub: https://github.com/sarkarbikram90/airun-profiler
+Docs & Lab: https://github.com/sarkarbikram90/airun-profiler#readme
 
 Feedback and teardown requests welcome below!
 ```
@@ -71,7 +71,7 @@ As part of our AIRUN-100 campaign, we are doing complimentary 15-minute AI Execu
 
 If you'd like a custom execution graph teardown of your agent pipeline, comment "Teardown" or DM me.
 
-Repo: https://github.com/sarkarbikram90/airun-tracing
+Repo: https://github.com/sarkarbikram90/airun-profiler
 ```
 
 ---
@@ -94,7 +94,7 @@ Open to a 15-minute teardown this week?
 Best,
 Bikram Sarkar
 Maintainer, airun
-https://github.com/sarkarbikram90/airun-tracing
+https://github.com/sarkarbikram90/airun-profiler
 ```
 
 ---

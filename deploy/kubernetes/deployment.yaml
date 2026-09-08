@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: airun-server
-          image: ghcr.io/sarkarbikram90/airun-tracing:latest
+          image: ghcr.io/sarkarbikram90/airun-profiler:latest
           imagePullPolicy: Always
           command: ["airun", "ui", "--host", "0.0.0.0", "--port", "8080"]
           ports:

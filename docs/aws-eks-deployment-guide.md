@@ -140,7 +140,7 @@ kubectl apply -k deploy/kubernetes/
 
 This creates:
 - `PersistentVolumeClaim`: 10GB AWS EBS `gp3` storage for traces.
-- `Deployment`: `airun-dashboard` running `ghcr.io/sarkarbikram90/airun-tracing:latest`.
+- `Deployment`: `airun-dashboard` running `ghcr.io/sarkarbikram90/airun-profiler:latest`.
 - `Service`: `airun-service` on port 80.
 - `Ingress`: AWS Application Load Balancer (ALB).
 

@@ -171,7 +171,7 @@ kubectl apply -k deploy/kubernetes/aks/
 
 This single command automatically deploys:
 1. **`PersistentVolumeClaim`** (`airun-trace-pvc`): 20GB Azure Premium SSD Disk (`managed-csi-premium`).
-2. **`Deployment`** (`airun-dashboard`): Runs `ghcr.io/sarkarbikram90/airun-tracing:latest` with the executive web dashboard.
+2. **`Deployment`** (`airun-dashboard`): Runs `ghcr.io/sarkarbikram90/airun-profiler:latest` with the executive web dashboard.
 3. **`Service`** (`airun-service`): Exposes port 80 to the internal cluster network.
 4. **`Ingress`** (`airun-aks-ingress`): Configures the Azure Application Gateway Ingress Controller (AGIC) with `/healthz` probing.
 5. **`DaemonSet`** (`airun-gpu-agent`): Deploys the Rust collector on GPU nodes to scrape DCGM metrics at 10Hz and ingest OTLP spans on port `4318`.

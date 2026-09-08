@@ -174,7 +174,7 @@ kubectl apply -k deploy/kubernetes/gke/
 This single command automatically deploys:
 1. **`PersistentVolumeClaim`** (`airun-trace-pvc`): 20GB Compute Engine Persistent Disk (`standard-rwo`).
 2. **`BackendConfig`** (`airun-backendconfig`): Configures Google Cloud Load Balancer HTTP health checking (`/healthz` on port 8080).
-3. **`Deployment`** (`airun-dashboard`): Runs `ghcr.io/sarkarbikram90/airun-tracing:latest` with the executive web dashboard.
+3. **`Deployment`** (`airun-dashboard`): Runs `ghcr.io/sarkarbikram90/airun-profiler:latest` with the executive web dashboard.
 4. **`Service`** (`airun-service`): Uses Network Endpoint Groups (NEG) for direct container routing.
 5. **`Ingress`** (`airun-gke-ingress`): Provisions a Google Cloud HTTP(S) Load Balancer bound to `airun-static-ip`.
 6. **`DaemonSet`** (`airun-gpu-agent`): Deploys the Rust collector on GPU nodes to scrape DCGM at 10Hz and receive OTLP spans on port `4318`.

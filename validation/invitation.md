@@ -22,7 +22,7 @@ Unlike heavy cloud dashboards, `airun` runs 100% locally with zero configuration
 4. Spend 10 minutes sharing what was confusing, what metrics were missing, and where your agents get unexpectedly slow or expensive.
 
 If you're open to giving it a quick spin, here is the repo / install guide:
-[Quickstart Guide](../docs/quickstart.md) • [GitHub Repository](https://github.com/sarkarbikram90/airun-tracing)
+[Quickstart Guide](../docs/quickstart.md) • [GitHub Repository](https://github.com/sarkarbikram90/airun-profiler)
 
 Thanks so much for your time,
 [Your Name]

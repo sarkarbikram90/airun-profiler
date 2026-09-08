@@ -56,12 +56,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sarkarbikram90/airun-tracing"
-Documentation = "https://github.com/sarkarbikram90/airun-tracing#readme"
-Repository = "https://github.com/sarkarbikram90/airun-tracing"
-"Issue Tracker" = "https://github.com/sarkarbikram90/airun-tracing/issues"
-Changelog = "https://github.com/sarkarbikram90/airun-tracing/blob/main/CHANGELOG.md"
-Specification = "https://github.com/sarkarbikram90/airun-tracing/blob/main/SPECIFICATION.md"
+Homepage = "https://github.com/sarkarbikram90/airun-profiler"
+Documentation = "https://github.com/sarkarbikram90/airun-profiler#readme"
+Repository = "https://github.com/sarkarbikram90/airun-profiler"
+"Issue Tracker" = "https://github.com/sarkarbikram90/airun-profiler/issues"
+Changelog = "https://github.com/sarkarbikram90/airun-profiler/blob/main/CHANGELOG.md"
+Specification = "https://github.com/sarkarbikram90/airun-profiler/blob/main/SPECIFICATION.md"
 
 [project.optional-dependencies]
 dev = [

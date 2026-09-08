@@ -16,8 +16,8 @@ pip install airun-profiler
 Or from source:
 
 ```bash
-git clone https://github.com/sarkarbikram90/airun-tracing.git
-cd airun-tracing
+git clone https://github.com/sarkarbikram90/airun-profiler.git
+cd airun-profiler
 pip install -e .
 ```
 
