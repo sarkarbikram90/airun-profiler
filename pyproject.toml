@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "airun-profiler"
-version = "0.2.0"
+version = "0.1.3"
 description = "AI Infrastructure Reliability & Economics Platform: Intelligence per Dollar & Watt, Energy Profiling, Eval-Driven Routing, and AI Disaster Recovery."
 readme = "README.md"
 license = { text = "Apache-2.0" }

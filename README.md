@@ -1,7 +1,7 @@
 # AI Infrastructure Reliability & Economics Platform (`airun`)
 
 [![CI](https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml/badge.svg)](https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.1.3-blue.svg)](pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
 

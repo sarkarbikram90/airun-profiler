@@ -24,7 +24,7 @@ from airun.store import get_trace_store
 class AirunServerHandler(BaseHTTPRequestHandler):
     """HTTP Request Handler providing REST API and single-page executive web UI."""
 
-    server_version = "airun-server/0.2.0"
+    server_version = "airun-server/0.1.3"
 
     def _send_json(self, data: Any, status: int = 200):
         """Helper to send JSON response."""
@@ -94,7 +94,7 @@ class AirunServerHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "status": "ok",
-                    "version": "0.2.0",
+                    "version": "0.1.3",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             )

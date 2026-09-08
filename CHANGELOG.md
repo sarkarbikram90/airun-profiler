@@ -2,9 +2,15 @@
 
 All notable changes to `airun` are documented in this file.
 
-## [0.2.0] - 2026-09-07
+## [0.1.3] - 2026-09-07
 
 ### Added
+- **Rust Real-Time Data Plane (`crates/airun-collector`)**: High-throughput DaemonSet with in-memory ring buffer (10Hz / 100ms), OTLP span ingestion (`:4318`), DCGM/NVML scraping with graceful fallback, and sub-millisecond circuit breaker state machine.
+- **Time-Window Correlation Engine (`src/airun/analysis/correlation.py`)**: Connects logical trace spans directly to physical GPU silicon stalls (SM active cycles, PCIe TX/RX saturation, true power draw).
+- **Terrifyingly Specific Hardware Bleed Reporting (`airun waste --hardware`)**: Exact dollar loss per week, hardware symptoms, root causes, and actionable configuration fixes.
+- **Workload Economics & FinOps Optimization (`airun waste --workload`)**: Multi-agent spend attribution and projected cost, latency, and quality improvements from model routing.
+- **TypeScript Control Plane API Gateway (`packages/control-plane`)**: Express API with PostgreSQL state contracts and Pub/Sub event schemas.
+- **Production Kubernetes & Helm Deployment Artifacts (`deploy/helm/airun-data-plane/`, `deploy/kubernetes/daemonset-agent.yaml`)**.
 - **AI Infrastructure Command Center (`airun ui` / `airun serve`)**:
   - Executive KPI Command Center displaying Compute Cost, Energy Spend, Cluster & Effective Utilization, Intelligence / $, Intelligence / Watt, and Wasted Compute.
   - Interactive top bottleneck incident banner with daily projected savings and remediation recommendations.

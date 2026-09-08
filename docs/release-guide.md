@@ -1,6 +1,6 @@
 # Release & Publishing Runbook
 
-Follow this checklist whenever releasing a new version of `airun` (e.g., `v0.1.2`, `v0.2.0`).
+Follow this checklist whenever releasing a new version of `airun` (e.g., `v0.1.2`, `v0.1.3`).
 
 ---
 

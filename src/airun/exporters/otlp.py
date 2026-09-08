@@ -97,7 +97,7 @@ class OTLPSpanExporter:
                     },
                     "scopeSpans": [
                         {
-                            "scope": {"name": "airun-sdk", "version": "0.2.0"},
+                            "scope": {"name": "airun-sdk", "version": "0.1.3"},
                             "spans": spans_json,
                         }
                     ],
