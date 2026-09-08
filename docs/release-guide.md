@@ -1,77 +1,64 @@
-# Release & Publishing Runbook
+# Automated Release & Publishing Runbook
 
-Follow this checklist whenever releasing a new version of `airun` (e.g., `v0.1.2`, `v0.1.3`).
-
----
-
-## The 4-Step Release Workflow
-
-### Step 1: Bump the Version Number (2 Files)
-
-Update the version string in:
-1. [`pyproject.toml`](../pyproject.toml):
-   ```toml
-   [project]
-   version = "0.1.2"  # Update version
-   ```
-2. [`src/airun/__init__.py`](../src/airun/__init__.py):
-   ```python
-   __version__ = "0.1.2"  # Update version
-   ```
-3. Update [`CHANGELOG.md`](../CHANGELOG.md) with key changes, bug fixes, or new features.
+`airun` provides a fully automated CI/CD release pipeline via GitHub Actions (`.github/workflows/release.yml`).
 
 ---
 
-### Step 2: Run Tests & Build Verification
+## 1-Command Automated Release
 
-Ensure all tests and linting checks pass:
-```bash
-# 1. Run unit, integration, and benchmark tests
-pytest -v --cov=airun
-
-# 2. Run linter and formatting checks
-ruff check src tests examples validation
-
-# 3. Clean and build distribution packages
-python -m build
-
-# 4. Verify package metadata
-python -m twine check dist/*
-```
-
----
-
-### Step 3: Commit and Push Code
+Run the release script with your target semantic version:
 
 ```bash
-git add .
-git commit -m "chore(release): bump version to v0.1.2"
-git push origin main
+python scripts/release.py 0.1.4
 ```
+
+This single command automatically:
+1. Updates the version across all manifests (`pyproject.toml`, `src/airun/__init__.py`, `crates/airun-collector/Cargo.toml`, `packages/control-plane/package.json`, Helm charts, README).
+2. Runs the complete test suite (`pytest`) and packaging build (`python -m build`).
+3. Verifies package metadata with `twine check`.
+4. Commits: `chore(release): bump version to v0.1.4`.
+5. Tags: `v0.1.4`.
+6. Pushes `main` and tag `v0.1.4` to GitHub.
 
 ---
 
-### Step 4: Publish to PyPI & GitHub Packages
+## What GitHub Actions Does Automatically
 
-#### A. Publish to PyPI
-```bash
-python -m twine upload dist/airun_profiler-0.1.2*
-```
-*(Username: `__token__`, Password: your PyPI API token)*
+When tag `v*.*.*` is pushed to GitHub, [`.github/workflows/release.yml`](../.github/workflows/release.yml) automatically triggers:
 
-#### B. Create Git Tag (Automatically triggers GitHub Docker Package release)
-```bash
-git tag v0.1.2
-git push origin v0.1.2
-```
-*GitHub Actions will automatically build the new Docker container and push `ghcr.io/sarkarbikram90/airun-tracing:v0.1.2` and `:latest` to GitHub Packages.*
+1. **Builds Wheel & SDist**: Builds Python `.whl` and `.tar.gz` distribution packages.
+2. **Publishes to PyPI**: Uploads the packages to PyPI (via PyPI Trusted Publishing or `PYPI_API_TOKEN`).
+3. **Creates GitHub Release**: Automatically publishes an official GitHub Release with release notes and attaches the built `.whl` and `.tar.gz` assets.
+4. **Publishes Docker Image**: Builds the multi-stage Docker container and publishes `ghcr.io/sarkarbikram90/airun-tracing:v0.1.4` and `:latest` to GitHub Packages.
 
 ---
 
-### Step 5: Publish the GitHub Release Note
+## One-Time Setup: Connecting PyPI for Automated Publishing
 
-1. Go to: [https://github.com/sarkarbikram90/airun-tracing/releases/new?tag=v0.1.2](https://github.com/sarkarbikram90/airun-tracing/releases/new?tag=v0.1.2)
-2. Set title to `v0.1.2 — [Release Headline]`
-3. Paste the changelog notes.
-4. Drag and drop the built `.whl` and `.tar.gz` files from `dist/`.
-5. Click **"Publish release"**.
+You have two options to enable automatic PyPI publishing from GitHub Actions:
+
+### Option A: PyPI Trusted Publishing (Recommended - Zero Secrets)
+
+Trusted Publishing uses OpenID Connect (OIDC) between GitHub and PyPI, eliminating the need to store long-lived API tokens.
+
+1. Go to your PyPI project: [https://pypi.org/manage/project/airun-profiler/settings/publishing/](https://pypi.org/manage/project/airun-profiler/settings/publishing/)
+2. Under **"Add a publisher"**, select **"GitHub"**.
+3. Fill in:
+   - **Owner**: `sarkarbikram90`
+   - **Repository name**: `airun-tracing`
+   - **Workflow name**: `release.yml`
+   - **Environment name**: *(leave blank)*
+4. Click **"Add publisher"**.
+*Done! Every time you push a tag, GitHub Actions will publish to PyPI automatically without any token.*
+
+---
+
+### Option B: PyPI API Token (Traditional Secret)
+
+1. Create a PyPI API Token on PyPI: [https://pypi.org/manage/account/token/](https://pypi.org/manage/account/token/)
+   - Scope: Project `airun-profiler` (or all projects).
+2. Go to your GitHub repository:
+   - **Settings** $\rightarrow$ **Secrets and variables** $\rightarrow$ **Actions** $\rightarrow$ **New repository secret**.
+3. Name: `PYPI_API_TOKEN`
+4. Secret: `pypi-...` (your token).
+5. Click **"Add secret"**.

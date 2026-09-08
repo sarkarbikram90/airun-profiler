@@ -34,6 +34,9 @@ release-dry-run: build
 	python -m airun demo
 	python -m airun report latest
 
+release:
+	python scripts/release.py $(version)
+
 docs:
 	@echo "Documentation located in docs/ and validation/ directories."
 
