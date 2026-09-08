@@ -363,6 +363,7 @@ python examples/lab/run_all.py
 - **Deployment Guides**:
   - [Google Kubernetes Engine (GCP GKE) Deployment Guide](docs/gcp-gke-deployment-guide.md)
   - [Amazon Elastic Kubernetes Service (AWS EKS) Deployment Guide](docs/aws-eks-deployment-guide.md)
+  - [Azure Kubernetes Service (Azure AKS) Deployment Guide](docs/azure-aks-deployment-guide.md)
 - **Technical Architecture & Specifications**:
   - [System Architecture & Distributed Data Path](docs/architecture.md)
   - [Master Product Specification (`spec.md`)](spec.md)
