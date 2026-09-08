@@ -2,11 +2,11 @@
 
 <p align="center">
   <a href="https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml"><img src="https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/v/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
+  <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/v/airun-profiler?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/dm/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="Downloads"></a>
   <a href="https://github.com/sarkarbikram90/airun-tracing"><img src="https://img.shields.io/github/stars/sarkarbikram90/airun-tracing?style=social" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/tests-92%20passed-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-93%20passed-brightgreen.svg" alt="Tests">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Ruff"></a>
 </p>
 
