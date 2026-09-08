@@ -206,6 +206,7 @@ impl TelemetryRingBuffer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn push(&self, sample: Dcgmsample) {
         let mut buf = self.buffer.write().unwrap();
         if buf.len() >= self.capacity {
@@ -224,6 +225,7 @@ impl TelemetryRingBuffer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.buffer.read().unwrap().len()
     }

@@ -72,6 +72,7 @@ impl CircuitBreaker {
         }
     }
 
+    #[allow(dead_code)]
     pub fn record_failure(&self, latency_ms: f32) -> BreakerState {
         let mut failures = self.consecutive_failures.write().unwrap();
         let mut state = self.state.write().unwrap();

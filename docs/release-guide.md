@@ -30,6 +30,7 @@ When tag `v*.*.*` is pushed to GitHub, [`.github/workflows/release.yml`](../.git
 2. **Publishes to PyPI**: Uploads the packages to PyPI (via PyPI Trusted Publishing or `PYPI_API_TOKEN`).
 3. **Creates GitHub Release**: Automatically publishes an official GitHub Release with release notes and attaches the built `.whl` and `.tar.gz` assets.
 4. **Publishes Docker Image**: Builds the multi-stage Docker container and publishes `ghcr.io/sarkarbikram90/airun-profiler:v0.1.4` and `:latest` to GitHub Packages.
+5. **Publishes Rust Crate (`airun-collector`)**: Uploads `airun-collector` to [crates.io](https://crates.io) (when `CARGO_REGISTRY_TOKEN` is configured).
 
 ---
 
@@ -62,3 +63,35 @@ Trusted Publishing uses OpenID Connect (OIDC) between GitHub and PyPI, eliminati
 3. Name: `PYPI_API_TOKEN`
 4. Secret: `pypi-...` (your token).
 5. Click **"Add secret"**.
+
+---
+
+## Publishing the Rust Crate (`airun-collector`) to crates.io
+
+The Rust data plane crate [`crates/airun-collector`](../crates/airun-collector/) is completely configured and ready to publish.
+
+### Option A: Direct Publishing via Cargo CLI
+
+1. Log in to [crates.io](https://crates.io) with your GitHub account.
+2. Generate an API token at: [https://crates.io/settings/tokens](https://crates.io/settings/tokens) (New Token $\rightarrow$ Scope: `publish-new`, `publish-update`).
+3. Authenticate your local cargo:
+   ```bash
+   cargo login <your-crates-io-token>
+   ```
+4. Publish the crate:
+   ```bash
+   cd crates/airun-collector
+   cargo publish
+   ```
+
+### Option B: Automated Publishing via GitHub Actions
+
+1. Copy your crates.io API token.
+2. In your GitHub repository:
+   - **Settings** $\rightarrow$ **Secrets and variables** $\rightarrow$ **Actions** $\rightarrow$ **New repository secret**.
+3. Name: `CARGO_REGISTRY_TOKEN`
+4. Value: `<your-crates-io-token>`
+5. Click **"Add secret"**.
+
+*Whenever a new release tag `v*.*.*` is pushed, GitHub Actions will automatically compile and publish the crate to crates.io!*
+
