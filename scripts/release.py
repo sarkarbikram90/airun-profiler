@@ -148,9 +148,9 @@ def main() -> None:
         sys.exit(1)
 
     tag = f"v{version}"
-    print(f"============================================================")
+    print("============================================================")
     print(f"  airun Automated Release Pipeline -> {tag}")
-    print(f"============================================================")
+    print("============================================================")
 
     bump_versions(version)
 
@@ -178,12 +178,12 @@ def main() -> None:
 
     print("\n============================================================")
     print(f"  [SUCCESS] Release {tag} pushed to GitHub!")
-    print(f"  GitHub Actions is now automatically:")
-    print(f"    1. Building Wheel & SDist")
-    print(f"    2. Publishing to PyPI (if PYPI_API_TOKEN or Trusted Publisher configured)")
-    print(f"    3. Creating GitHub Release with release notes and assets")
-    print(f"    4. Building & pushing Docker container to ghcr.io")
-    print(f"============================================================")
+    print("  GitHub Actions is now automatically:")
+    print("    1. Building Wheel & SDist")
+    print("    2. Publishing to PyPI (if PYPI_API_TOKEN or Trusted Publisher configured)")
+    print("    3. Creating GitHub Release with release notes and assets")
+    print("    4. Building & pushing Docker container to ghcr.io")
+    print("============================================================")
 
 
 if __name__ == "__main__":

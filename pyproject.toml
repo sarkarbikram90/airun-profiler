@@ -5,24 +5,47 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "airun-profiler"
 version = "0.1.3"
-description = "AI Infrastructure Reliability & Economics Platform: Intelligence per Dollar & Watt, Energy Profiling, Eval-Driven Routing, and AI Disaster Recovery."
+description = "AI Infrastructure Economics & Reliability Platform: Detect GPU Silicon Waste (Dataloader, NCCL, PCIe), Measure Intelligence per Dollar & Watt, and Automate Multi-Model Failover."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
     { name = "Bikram Sarkar" }
 ]
-keywords = ["ai", "tracing", "observability", "profiler", "llm", "agents", "opentelemetry", "cost"]
+keywords = [
+    "ai-infrastructure",
+    "gpu-optimization",
+    "finops",
+    "nvidia-dcgm",
+    "h100",
+    "mfu",
+    "cuda",
+    "opentelemetry",
+    "pytorch-profiler",
+    "silicon-waste",
+    "model-routing",
+    "circuit-breaker",
+    "disaster-recovery",
+    "energy-profiling",
+    "llmops",
+    "tracing",
+    "observability",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Debuggers",
-    "Topic :: System :: Monitoring"
+    "Topic :: System :: Distributed Computing",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Monitoring",
+    "Framework :: AsyncIO",
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -31,6 +54,14 @@ dependencies = [
     "pydantic>=2.5.0",
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/sarkarbikram90/airun-tracing"
+Documentation = "https://github.com/sarkarbikram90/airun-tracing#readme"
+Repository = "https://github.com/sarkarbikram90/airun-tracing"
+"Issue Tracker" = "https://github.com/sarkarbikram90/airun-tracing/issues"
+Changelog = "https://github.com/sarkarbikram90/airun-tracing/blob/main/CHANGELOG.md"
+Specification = "https://github.com/sarkarbikram90/airun-tracing/blob/main/spec.md"
 
 [project.optional-dependencies]
 dev = [
