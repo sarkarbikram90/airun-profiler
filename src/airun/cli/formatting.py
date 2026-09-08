@@ -693,3 +693,111 @@ def render_profiler_summary_panel(
         border_style="green",
         expand=False,
     )
+
+
+def render_hardware_bleed_panel(diagnosis: Any) -> Panel:
+    """Render the terrifyingly specific dollar-denominated hardware waste report."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column("Field", style="bold white")
+    table.add_column("Details", style="cyan")
+
+    table.add_row("Workload", f"{diagnosis.workload_name} ({diagnosis.num_gpus}x {diagnosis.accelerator.upper()})")
+    table.add_row("Bottleneck", f"[bold red]{diagnosis.primary_bottleneck}[/bold red]")
+    table.add_row("Symptom", f"[bold yellow]{diagnosis.symptom}[/bold yellow]")
+    table.add_row(
+        "Financial Bleed",
+        f"[bold red]${diagnosis.weekly_bleed_usd:,.2f} / week[/bold red] (${diagnosis.hourly_bleed_usd:.2f}/hr | ${diagnosis.monthly_bleed_usd:,.2f}/mo)",
+    )
+    table.add_row("Root Cause", diagnosis.root_cause)
+    table.add_row("Actionable Fix", f"[bold green]{diagnosis.remediation_action}[/bold green]")
+
+    impact_str = ", ".join(f"{k}: {v}" for k, v in diagnosis.expected_impact.items())
+    table.add_row("Expected Impact", f"[bold green]{impact_str}[/bold green]")
+
+    if diagnosis.culprit_spans:
+        culprits_table = Table(
+            title="[bold yellow]Culprit Execution Spans in Critical Path[/bold yellow]",
+            border_style="dim yellow",
+            show_header=True,
+        )
+        culprits_table.add_column("Span Name", style="bold white")
+        culprits_table.add_column("Duration (ms)", justify="right", style="cyan")
+        culprits_table.add_column("Cost (USD)", justify="right", style="red")
+        culprits_table.add_column("Tokens", justify="right")
+
+        for s in diagnosis.culprit_spans:
+            culprits_table.add_row(
+                s.get("name", "span"),
+                f"{s.get('duration_ms', 0):.1f}ms",
+                f"${s.get('cost_usd', 0):.4f}",
+                str(s.get("tokens", 0)),
+            )
+
+        grid = Table.grid(padding=(1, 0))
+        grid.add_row(table)
+        grid.add_row(culprits_table)
+    else:
+        grid = table
+
+    return Panel(
+        grid,
+        title=f"[bold red]! HARDWARE WASTE DETECTED IN TRACE: {diagnosis.trace_id}[/bold red]",
+        border_style="red",
+        expand=False,
+    )
+
+
+def render_workload_waste_panel(
+    workload_name: str,
+    monthly_spend: float = 84210.0,
+    potential_waste: float = 17430.0,
+    top_issue: str = "42% of cost from researcher agent",
+    root_cause: str = "Large prompt context + expensive model",
+    recommendation: str = "Route 73% of requests to cheaper model",
+    expected_impact: dict[str, str] | None = None,
+) -> Panel:
+    """Render workload-level economic waste report quantifying cost, latency, and quality impact."""
+    impact = expected_impact or {
+        "Cost": "-31%",
+        "Latency": "-18%",
+        "Quality": "-0.4%",
+    }
+
+    table = Table.grid(padding=(0, 2))
+    table.add_column("Metric", style="bold white")
+    table.add_column("Observation", style="cyan")
+
+    table.add_row("Workload", workload_name)
+    table.add_row("Monthly Spend", f"${monthly_spend:,.2f}")
+    waste_pct = (potential_waste / monthly_spend * 100) if monthly_spend > 0 else 0
+    table.add_row(
+        "Potential Waste",
+        f"[bold red]${potential_waste:,.2f}[/bold red] ({waste_pct:.1f}% recoverable)",
+    )
+    table.add_row("Top Issue", f"[bold yellow]{top_issue}[/bold yellow]")
+    table.add_row("Root Cause", root_cause)
+    table.add_row("Recommendation", f"[bold green]{recommendation}[/bold green]")
+
+    impact_table = Table(
+        title="[bold green]Expected Impact from Optimization[/bold green]",
+        border_style="green",
+        show_header=True,
+    )
+    impact_table.add_column("Dimension", style="bold white")
+    impact_table.add_column("Projected Change", style="bold cyan")
+
+    for k, v in impact.items():
+        color = "green" if v.startswith("-") and "Cost" in k or "Latency" in k else ("yellow" if "Quality" in k else "cyan")
+        impact_table.add_row(k, f"[{color}]{v}[/{color}]")
+
+    grid = Table.grid(padding=(1, 0))
+    grid.add_row(table)
+    grid.add_row(impact_table)
+
+    return Panel(
+        grid,
+        title="[bold cyan]Airun Workload Economics & Optimization Report[/bold cyan]",
+        border_style="bright_blue",
+        expand=False,
+    )
+

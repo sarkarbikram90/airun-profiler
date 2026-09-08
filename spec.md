@@ -143,56 +143,181 @@ Interactive dashboard providing:
 
 ---
 
-## 4. Production Architecture & Technology Stack Allocation
+## 4. Production Architecture & Durable Technology Stack Allocation
 
-`airun` adopts a problem-driven separation of concerns. Languages and frameworks are selected strictly according to workload characteristics:
+`airun` enforces a strict, problem-driven separation of concerns. Rather than treating components as mere utilities, each language and layer has a **durable architectural role**:
 
 ```text
-                                AIRUN ARCHITECTURE
-                                       │
-                ┌──────────────────────┴──────────────────────┐
-                │                                             │
-          CONTROL PLANE                                   DATA PLANE
-          (TypeScript)                                      (Rust)
-                │                                             │
-        Node.js / Next.js                             Telemetry Collector
-        API Gateway & Auth                           High-Throughput Engine
-        PostgreSQL State Store                       Scheduler / Breakers
-                │                                             │
-                └──────────────┬───────────────┬──────────────┘
-                               │               │
-                               ▼               ▼
-                        ┌──────────────┐┌──────────────┐
-                        │  PostgreSQL  ││   Pub/Sub    │
-                        │  State &     ││  Event Bus   │
-                        │  Decisions   ││              │
-                        └──────────────┘└──────┬───────┘
-                                               │
-                                               ▼
-                                        ┌──────────────┐
-                                        │    Python    │
-                                        │ Analytics/ML │
-                                        │ Waste Engine │
-                                        └──────┬───────┘
-                                               │
-                                               ▼
-                                        ┌──────────────┐
-                                        │     GKE      │
-                                        │  Kubernetes  │
-                                        └──────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                       TypeScript                         │
+│               Control Plane / API Gateway                │
+│                 + Executive Web Console                  │
+└────────────────────────────┬─────────────────────────────┘
+                             │ PostgreSQL State, Decisions, Metadata, Policies
+┌────────────────────────────▼─────────────────────────────┐
+│                         Pub/Sub                          │
+│                      Event Backbone                      │
+└──────────────┬────────────────────────────┬──────────────┘
+               │                            │
+┌──────────────▼─────────────┐┌─────────────▼──────────────┐
+│            Rust            ││           Python           │
+│    Real-Time Data Plane    ││      Intelligence Plane    │
+│ (Ring Buffer, DCGM, OTLP)  ││ (Correlation, Waste, MFU)  │
+└──────────────┬─────────────┘└─────────────┬──────────────┘
+               │                            │
+               └──────────────┬─────────────┘
+                              │
+┌─────────────────────────────▼────────────────────────────┐
+│                      GKE Kubernetes                      │
+│             Production Execution Environment             │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### 4.1 Technology Stack Allocation Matrix
+### 4.1 Durable Stack Allocation Matrix
 
-| Technology | Architectural Layer | Responsibility | Justification |
+| Language / Tech | Durable Role | Responsibilities | Justification |
 |---|---|---|---|
-| **Rust** | Data Plane | Node/cluster telemetry collector, high-frequency metric aggregation, critical path engine, real-time circuit-breaker runtime | Zero-cost abstractions, memory safety, sub-millisecond predictable latency, minimal CPU/memory footprint on GPU nodes |
-| **TypeScript** | Control Plane | REST & WebSocket APIs, authentication/RBAC, Next.js dashboard, cluster configuration, billing | Rapid product iteration, rich frontend ecosystem, robust enterprise API tooling |
-| **Python** | Intelligence Layer | AI workload SDK (`@trace`), MFU calculator, Physics of AI Waste engine, anomaly detection, CLI | Universal AI/ML library support (PyTorch, NumPy, Polars), de-facto language of AI engineers |
-| **PostgreSQL** | System of Record | Users, organizations, projects, clusters, workloads, runs, policies, recommendations, incidents, cost records | ACID consistency, relational integrity, robust SQL query interface for application state |
-| **Message Queue (Pub/Sub)** | Event Backbone | High-frequency telemetry streaming, workload lifecycle events, alerts, DR events, async optimization jobs | Horizontal scalability, decoupled asynchronous consumers, managed reliability on GCP |
-| **GKE Kubernetes** | Orchestration | Production runtime for API, workers, UI, and GPU node DaemonSets | Cloud-native scaling, multi-cloud compatibility, managed GPU node pool support |
-| **Cloud Storage (GCS)** | Cold Telemetry Store | Parquet metric batches, full trace exports, raw profiling dumps, DR reports | Low-cost durable long-term storage for historical analytics |
+| **Rust** | **Real-Time Data Plane** | Node/cluster telemetry collector, high-frequency GPU telemetry (DCGM/NVML), in-memory ring buffering (10Hz / 100ms), OTLP span ingestion, critical-path DAG engine, tri-state circuit breaker runtime, local backpressure | Zero-cost abstractions, predictable sub-millisecond execution, zero garbage collection pauses on GPU nodes, safe concurrency |
+| **TypeScript** | **Control Plane** | Enterprise API gateway (REST/gRPC), authentication, RBAC, organizations, projects, billing, cluster configuration, policies, executive dashboard, WebSockets, admin workflows | Rapid product iteration, world-class frontend/API ecosystem, robust JSON/GraphQL integration |
+| **Python** | **Intelligence Plane & SDK** | Developer-facing `@trace` SDK, OTLP span exporter, Time-Window Correlation engine, Physics of AI Waste diagnostics, MFU calculator, anomaly detection, forecasting, Pareto frontier routing, CLI | De-facto language of AI/ML engineers, universal framework bindings (PyTorch, NumPy, Polars, Hugging Face) |
+| **PostgreSQL** | **System of Record** | Organizations, projects, clusters, workloads, runs, cost records, policies, alerts, incidents, recommendations, 1-minute aggregated rollups | ACID guarantees, relational integrity for billing, auditing, and configuration state |
+| **Pub/Sub** | **Event Fabric / Backbone** | High-throughput decoupled event stream for telemetry batches, run completions, hardware bleed alerts, incident triggers | Managed horizontal scalability, at-least-once delivery, zero inter-service coupling |
+| **GKE Kubernetes** | **Execution Environment** | DaemonSet orchestrator on GPU node pools (`nvidia.com/gpu`), API gateway deployments, background analytics workers | Managed GPU scheduling, multi-cloud compatibility, cloud-native scalability |
+| **Cloud Storage (GCS)** | **Cold Lakehouse Store** | Compressed Parquet telemetry archives, full trace dumps, raw profiling snapshots | Low-cost durable long-term storage for historical regression and benchmark queries |
+
+---
+
+### 4.2 The Crucial Bridge: Logical vs. Physical Tracing
+
+Standard AI observability tools (LangSmith, Langfuse, Helicone) operate exclusively at the **Logical Layer**:
+- Agent $\rightarrow$ Tool $\rightarrow$ LLM API calls
+- Prompt / completion tokens
+- API vendor invoices and latency
+
+Conversely, infrastructure monitoring tools (Datadog, Prometheus) operate exclusively at the **Physical Layer**:
+- Average node CPU/GPU percentage
+- Host memory utilization
+- Network interface bytes
+
+**`airun`'s category moat is the Time-Window Correlation Bridge connecting the logical trace span directly to the physical silicon.**
+
+```text
+Logical Trace (Python SDK):
+  [==================== agent_researcher span (140.1ms) ====================]
+         │
+         │ Correlated across exact microsecond timestamp window
+         ▼
+Physical Telemetry (Rust Data Plane Ring Buffer @ 10Hz):
+  SM Active Cycles:   [ 12.4%  |  11.8%  |  14.1%  |  13.0% ]  <-- Idle Stalls!
+  PCIe TX (MB/s):     [ 9,450  |  9,820  |  9,100  |  9,600 ]  <-- Saturation!
+  True Power (Watts): [ 280W   |  275W   |  285W   |  280W  ]  <-- Dropped vs 700W TDP
+         │
+         ▼
+Diagnosis & Actionable ROI:
+  * Bottleneck:  PCIe Bus Saturation (Vector DB host-to-device memory copy)
+  * Cost Bleed:  $2,847.20 / week ($16.95 / hour across 8x H100s)
+  * Root Cause:  Synchronous unpinned tensor allocations during embedding lookup
+  * Action:      Pin embeddings in VRAM and pass non_blocking=True
+  * Gain:        -28% latency, recover $967/week in GPU spend
+```
+
+---
+
+### 4.3 End-to-End Production Dataflow Path
+
+```text
+Python AI Workload / Agent (@trace SDK)
+      │
+      │ 1. Traces & Spans (OTLP HTTP via AIRUN_OTLP_ENDPOINT)
+      ▼
+Rust Data Plane (airun-collector DaemonSet on GKE GPU Node)
+      │ 2. Scrapes DCGM/NVML @ 10Hz into In-Memory Ring Buffer
+      │ 3. Evaluates Sub-Millisecond Tri-State Circuit Breakers
+      │ 4. Batches High-Frequency Metrics into 1Hz Telemetry Packets
+      │
+      │ Pub/Sub Event Fabric
+      ▼
+Rust Event Processor / Python Analytics Worker
+      │ 5. Performs Time-Window Correlation (Logical Spans <-> Physical Metrics)
+      │ 6. Computes Physics of AI Waste, MFU, and Financial Bleed ($/hr)
+      │ 7. Generates Concrete Actionable Recommendations
+      │
+      ├──────────────────────────────► PostgreSQL (State, Decisions, 1-Min Rollups)
+      ▼
+TypeScript Control Plane (REST / WebSocket API Gateway)
+      │ 8. Enforces RBAC, Organizations, Projects, and Policies
+      │
+      ▼
+Executive Command Center Web Dashboard & CLI (airun waste, airun compare)
+```
+
+---
+
+### 4.4 First Production-Grade Use Case & The Core Thesis
+
+> **AI Infrastructure Economics & Reliability.**
+> Observability is only the input. The output is **economic action**.
+
+`airun` tells an engineering team exactly where their AI workload is wasting money, latency, and compute—and quantifies the improvement from fixing it:
+
+#### Example: Multi-Agent Workload FinOps
+```text
+Workload:        customer-support-agent
+Monthly Spend:   $84,210.00
+Potential Waste: $17,430.00 (20.7% recoverable)
+Top Issue:       42% of cost from researcher agent
+Root Cause:      Large prompt context + expensive model
+Recommendation:  Route 73% of requests to cheaper model based on Pareto frontier
+Expected Impact:
+  * Cost:    -31%
+  * Latency: -18%
+  * Quality: -0.4%
+```
+
+#### Example: GPU Cluster Hardware Bleed
+```text
+! HARDWARE WASTE DETECTED IN TRACE: 5664cdc8
+-----------------------------------------------------------------
+Workload:    finetune-7b-v3 (8x H100 SXM5)
+Bottleneck:  Dataloader Starvation (CPU/IO Bound)
+Symptom:     GPU SM active cycles dropped to 38.2% (idle stalls)
+Cost Bleed:  $2,847.20 / week ($16.95 / hour)
+Root Cause:  Host CPU data loading workers starved accelerator between batches
+Action:      Increase DataLoader num_workers=8 and set pin_memory=True
+Impact:      Recover $967/week (+31% throughput gain)
+-----------------------------------------------------------------
+```
+
+---
+
+### 4.5 Architectural Answers to System Implementation Questions
+
+1. **Data Collection Efficiency**:
+   - Uses NVIDIA DCGM direct Unix domain socket (`/var/run/nvidia-dcgm/dcgm.sock`) and C/Rust bindings rather than spawning `nvidia-smi` subprocesses, keeping CPU overhead under 0.1%.
+   - In-memory `TelemetryRingBuffer` stores 1,000 samples @ 10Hz locally in RAM for zero-overhead correlation queries without disk I/O.
+   - Batches telemetry into 1-second envelopes before pushing to Pub/Sub to prevent network flooding.
+
+2. **Data Model**:
+   - Ingests traces via standard OpenTelemetry (OTLP) HTTP/JSON payloads (`resourceSpans -> scopeSpans -> spans`).
+   - Publishes telemetry batches in compact JSON/Protobuf envelopes.
+   - Long-term cold analytics archives are persisted in compressed columnar Apache Parquet format on GCS.
+
+3. **Kubernetes Integration**:
+   - Reads container and pod UIDs by inspecting cgroup paths (`/sys/fs/cgroup`) mounted into the DaemonSet container.
+   - Correlates pod metadata via the Kubernetes Downward API (`spec.nodeName`, `metadata.namespace`).
+
+4. **Error Handling & Graceful Degradation**:
+   - The Rust Data Plane checks for DCGM socket and NVML availability at initialization.
+   - If running on non-GPU nodes, development laptops, or environments without NVIDIA drivers, it gracefully activates `HardwareMode::FallbackEmulated` without crashing, preserving service uptime.
+
+5. **Deployment**:
+   - Production Helm chart provided in `deploy/helm/airun-data-plane/` and Kubernetes manifests in `deploy/kubernetes/`.
+   - Node pool tolerations: `nvidia.com/gpu=present:NoSchedule` and `cloud.google.com/gke-accelerator=present:NoSchedule`.
+   - Security context: Non-privileged execution with `hostPID: true`, `hostIPC: true`, read-only mounts to `/var/run/nvidia-dcgm`, `/sys`, and `/proc`.
+
+6. **Open Core vs. SaaS Boundary**:
+   - **Open Source (Apache 2.0)**: Python `@trace` SDK, CLI profiler (`airun profiler`), local Rust Data Plane agent, local SQLite store (`.airun/traces.db`).
+   - **Enterprise / Cloud (Commercial)**: Multi-tenant TypeScript control plane, centralized PostgreSQL & Pub/Sub aggregator, fleet-wide cluster optimization, autonomic scheduling remediation, enterprise SSO/RBAC.
 
 ---
 
@@ -222,14 +347,14 @@ To ensure rapid developer adoption while building toward enterprise cloud contro
 - **Storage**: Local SQLite / JSONL trace store (`.airun/traces.db`).
 - **Goal**: Zero network dependencies, microsecond profiler overhead, immediate developer delight in diagnosing local scripts and agent pipelines.
 
-### Phase 2 — Cloud Control Plane
-- **Scope**: Multi-tenant SaaS architecture.
+### Phase 2 — Cloud Control Plane & Silicon Bridge
+- **Scope**: Multi-tenant SaaS architecture connecting logical traces to physical silicon.
 - **Components**:
-  - `airun-agent` DaemonSet on GKE GPU nodes scraping NVIDIA DCGM.
+  - `airun-collector` Real-Time Data Plane DaemonSet in Rust with in-memory ring buffering and OTLP ingestion.
   - Managed GCP Pub/Sub event bus.
-  - Rust / Python background processing workers.
+  - Rust / Python background processing workers performing Time-Window Correlation.
   - PostgreSQL system of record (`deploy/postgres/schema.sql`).
-  - TypeScript / Node.js control plane API and Next.js Executive Web UI.
+  - TypeScript / Node.js control plane API and Executive Web UI (`packages/control-plane`).
 - **Goal**: Fleet-wide visibility across multi-node GPU clusters, quantifying aggregate financial bleed and delivering actionable FinOps recommendations.
 
 ### Phase 3 — Infrastructure Intelligence & Autonomic Remediation
@@ -250,19 +375,19 @@ The core differentiator of `airun` is that it does not merely alert on inefficie
                                THE AUTONOMIC LOOP
                                        │
                                     OBSERVE
-                          (Rust DCGM Telemetry Agent)
+                          (Rust Real-Time Data Plane)
                                        │
                                        ▼
                                    UNDERSTAND
-                         (Trace DAG & Critical Path)
+                          (Trace DAG & Critical Path)
                                        │
                                        ▼
-                               MEASURE ECONOMICS
-                           (Tokens/$, IPD, IPW, PUE)
+                                MEASURE ECONOMICS
+                            (Tokens/$, IPD, IPW, PUE)
                                        │
                                        ▼
-                                  FIND WASTE
-                         (Physics of AI Waste Engine)
+                                   FIND WASTE
+                          (Physics of AI Waste Engine)
                                        │
                                        ▼
                               RECOMMEND OPTIMIZATION

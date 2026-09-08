@@ -85,6 +85,38 @@ export interface Recommendation {
   createdAt: string;
 }
 
+export interface HardwareBleedReport {
+  workloadName: string;
+  traceId: string;
+  accelerator: string;
+  numGpus: number;
+  primaryBottleneck: string;
+  bottleneckCategory: 'dataloader_starvation' | 'nccl_overhead' | 'pcie_bottleneck' | 'framework_overhead';
+  symptom: string;
+  rootCause: string;
+  remediationAction: string;
+  hourlyBleedUsd: number;
+  weeklyBleedUsd: number;
+  monthlyBleedUsd: number;
+  expectedImpact: Record<string, string>;
+}
+
+export interface WorkloadEconomicsReport {
+  workloadId: string;
+  workloadName: string;
+  monthlySpendUsd: number;
+  potentialWasteUsd: number;
+  wastePercentage: number;
+  topIssue: string;
+  rootCause: string;
+  recommendation: string;
+  expectedImpact: {
+    cost: string;
+    latency: string;
+    quality: string;
+  };
+}
+
 export interface GoldenSignals {
   economics: {
     costPerEffectiveGpuHourUsd: number;

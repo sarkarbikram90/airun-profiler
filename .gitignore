@@ -101,3 +101,20 @@ docs/_build/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Rust build artifacts
+target/
+**/target/
+Cargo.lock
+
+# Node / TypeScript build artifacts
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+**/package-lock.json
+
+

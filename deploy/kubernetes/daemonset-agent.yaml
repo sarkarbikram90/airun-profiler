@@ -85,6 +85,9 @@ spec:
             - name: telemetry
               containerPort: 9445
               protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
           volumeMounts:
             - name: dcgm-socket
               mountPath: /var/run/nvidia-dcgm

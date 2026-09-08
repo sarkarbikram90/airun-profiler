@@ -199,38 +199,117 @@ airun compare previous latest
 
 ---
 
-## Production Architecture & 3-Phase Evolution
+## Production Architecture & Durable Technology Stack
 
-`airun` bridges developer runtime profiling and cloud-scale AI infrastructure optimization across three planned evolutionary phases:
+`airun` transforms AI infrastructure from opaque hardware spend into an accountable, measurable, and autonomic engineering discipline. Rather than treating components as mere utilities, each language and layer has a **durable architectural role**:
 
 ```text
-                    AIRUN
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-      CONTROL PLANE             DATA PLANE
-          │                         │
-     TypeScript                  Rust
-          │                         │
-          │             ┌───────────┼───────────┐
-          │             │           │           │
-          │         Collector   Processor   Scheduler
-          │             │           │           │
-          └─────────────┴───── Pub/Sub ─────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    │                       │
-                PostgreSQL              Python
-             State & Decisions        Analytics/ML
-                    │                       │
-                    └───────────┬───────────┘
-                                │
-                              GKE
+┌──────────────────────────────────────────────────────────┐
+│                       TypeScript                         │
+│               Control Plane / API Gateway                │
+│                 + Executive Web Console                  │
+└────────────────────────────┬─────────────────────────────┘
+                             │ PostgreSQL State, Decisions, Metadata, Policies
+┌────────────────────────────▼─────────────────────────────┐
+│                         Pub/Sub                          │
+│                      Event Backbone                      │
+└──────────────┬────────────────────────────┬──────────────┘
+               │                            │
+┌──────────────▼─────────────┐┌─────────────▼──────────────┐
+│            Rust            ││           Python           │
+│    Real-Time Data Plane    ││      Intelligence Plane    │
+│ (Ring Buffer, DCGM, OTLP)  ││ (Correlation, Waste, MFU)  │
+└──────────────┬─────────────┘└─────────────┬──────────────┘
+               │                            │
+               └──────────────┬─────────────┘
+                              │
+┌─────────────────────────────▼────────────────────────────┐
+│                      GKE Kubernetes                      │
+│             Production Execution Environment             │
+└──────────────────────────────────────────────────────────┘
 ```
 
+### Durable Architectural Boundaries
+
+| Layer / Technology | Durable Role | Core Responsibilities |
+|---|---|---|
+| **Rust** (`crates/airun-collector`) | **Real-Time Data Plane** | Node/cluster telemetry collector, high-frequency GPU telemetry (DCGM/NVML), in-memory ring buffer (10Hz / 100ms), OTLP span ingestion, critical-path DAG engine, tri-state circuit breaker runtime. |
+| **TypeScript** (`packages/control-plane`) | **Control Plane** | REST/gRPC API gateway, authentication/RBAC, organizations, projects, cluster configurations, billing, policies, and executive dashboard. |
+| **Python** (`src/airun`) | **Intelligence Plane & SDK** | Developer-facing `@trace` SDK, OTLP span exporter, Time-Window Correlation engine, Physics of AI Waste diagnostics, MFU calculator, and CLI. |
+| **PostgreSQL** (`deploy/postgres`) | **System of Record** | Source of truth for state, decisions, runs, policies, recommendations, and aggregated 1-minute rollups (never raw unaggregated telemetry). |
+| **Pub/Sub** | **Event Fabric** | High-throughput asynchronous event backbone for batched telemetry, run completions, and waste alerts. |
+| **GKE Kubernetes** (`deploy/kubernetes`, `deploy/helm`) | **Execution Environment** | Managed GPU node pools with `nvidia.com/gpu` tolerations and DaemonSets mounting `/var/run/nvidia-dcgm` and `/sys/fs/cgroup`. |
+
+---
+
+### The Crucial Bridge: Logical vs. Physical Tracing
+
+Observability tools (LangSmith, Langfuse) only observe the *logical* layer (tokens, API costs). Infrastructure monitors (Datadog) only observe the *physical* layer (average GPU utilization).
+
+**`airun`'s category moat is the Time-Window Correlation Bridge connecting the logical trace span directly to physical silicon.**
+
+Run the hardware waste diagnostic on any trace:
+```bash
+airun waste --hardware
+```
+
+Output:
+```text
++--- ! HARDWARE WASTE DETECTED IN TRACE: 5ff3390b470d49dc93de5ebb04d292aa ----+
+| Workload         research_agent_workflow (8x H100)                          |
+| Bottleneck       Dataloader Starvation (CPU/IO Bound)                       |
+| Symptom          GPU SM active cycles dropped to 38.2% (idle stalls) while  |
+|                  PCIe TX was idle (<400 MB/s)                               |
+| Financial Bleed  $1,599.36 / week ($9.52/hr | $6,854.40/mo)                 |
+| Root Cause       Host CPU data loading workers starved accelerator between  |
+|                  training mini-batches                                      |
+| Actionable Fix   Increase DataLoader num_workers=8, set pin_memory=True,    |
+|                  and pre-fetch tensors                                      |
+| Expected Impact  throughput_gain: +31%, waste_reduction: -82%,              |
+|                  weekly_cost_savings: $1279.49                              |
+|                                                                             |
+|             Culprit Execution Spans in Critical Path                        |
+| +---------------------------------------------------------------+           |
+| | Span Name               | Duration (ms) | Cost (USD) | Tokens |           |
+| |-------------------------+---------------+------------+--------|           |
+| | research_agent_workflow |       334.7ms |    $0.0000 |      0 |           |
+| | agent_planning          |       160.9ms |    $0.0000 |      0 |           |
+| | planner_llm_call        |       120.4ms |    $0.0073 |   1800 |           |
+| +---------------------------------------------------------------+           |
++-----------------------------------------------------------------------------+
+```
+
+Or diagnose workload-level economics:
+```bash
+airun waste --workload customer-support-agent
+```
+
+Output:
+```text
++---- Airun Workload Economics & Optimization Report -----+
+| Workload         customer-support-agent                 |
+| Monthly Spend    $84,210.00                             |
+| Potential Waste  $17,430.00 (20.7% recoverable)         |
+| Top Issue        42% of cost from researcher agent      |
+| Root Cause       Large prompt context + expensive model |
+| Recommendation   Route 73% of requests to cheaper model |
+|                                                         |
+|       Expected Impact from Optimization                 |
+| +------------------------------+                        |
+| | Dimension | Projected Change |                        |
+| |-----------+------------------|                        |
+| | Cost      | -31%             |                        |
+| | Latency   | -18%             |                        |
+| | Quality   | -0.4%            |                        |
+| +------------------------------+                        |
++---------------------------------------------------------+
+```
+
+---
+
 ### The 3 Evolutionary Phases
-- **Phase 1 — Developer Platform (Current)**: Local-first Python SDK & CLI (`@trace`, `airun report`, `airun compare`, `airun waste`, `airun frontier`) with microsecond overhead and zero network dependencies.
-- **Phase 2 — Cloud Control Plane**: Multi-tenant SaaS control plane featuring GKE GPU DaemonSet collector (`deploy/kubernetes/daemonset-agent.yaml`), Pub/Sub event backbone, and PostgreSQL for state & decisions (`deploy/postgres/schema.sql`).
+- **Phase 1 — Developer Platform (Current Foundation)**: Local-first Python SDK & CLI (`@trace`, `airun report`, `airun compare`, `airun waste`, `airun frontier`) with microsecond overhead and zero network dependencies.
+- **Phase 2 — Cloud Control Plane & Silicon Bridge**: Multi-tenant SaaS architecture connecting logical traces to physical silicon via Rust Data Plane DaemonSet (`deploy/kubernetes/daemonset-agent.yaml`, `deploy/helm/airun-data-plane/`), Pub/Sub, PostgreSQL (`deploy/postgres/schema.sql`), and TypeScript control plane (`packages/control-plane`).
 - **Phase 3 — Infrastructure Intelligence**: Closed autonomic product loop:
   $$\text{Observe} \longrightarrow \text{Understand} \longrightarrow \text{Measure Economics} \longrightarrow \text{Find Waste} \longrightarrow \text{Recommend Optimization} \longrightarrow \text{Remediate} \longrightarrow \text{Learn}$$
 

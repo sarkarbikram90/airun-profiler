@@ -1,0 +1,50 @@
+# Default values for airun-data-plane Helm chart.
+
+image:
+  repository: ghcr.io/sarkarbikram90/airun-data-plane
+  tag: "0.2.0"
+  pullPolicy: IfNotPresent
+
+cluster:
+  id: "us-central1-gke-prod"
+  provider: "gcp"
+
+gcp:
+  projectId: "airun-production"
+  pubsubTopic: "ai-infrastructure-events"
+
+dcgm:
+  socketPath: "/var/run/nvidia-dcgm"
+  samplingIntervalSec: 1
+  ringBufferCapacity: 1000
+
+otlp:
+  enabled: true
+  port: 4318
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "cloud.google.com/gke-accelerator"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+nodeAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: "cloud.google.com/gke-accelerator"
+            operator: "Exists"
+      - matchExpressions:
+          - key: "nvidia.com/gpu.present"
+            operator: "In"
+            values: ["true"]

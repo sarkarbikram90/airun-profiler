@@ -1,0 +1,15 @@
+apiVersion: v2
+name: airun-data-plane
+description: Production Helm chart for airun Real-Time Rust Data Plane & GPU DaemonSet on GKE/EKS
+type: application
+version: 0.2.0
+appVersion: "0.2.0"
+keywords:
+  - ai-infrastructure
+  - gpu-telemetry
+  - dcgm
+  - finops
+  - economics
+maintainers:
+  - name: airun Team
+    email: infra@airun.dev

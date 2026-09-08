@@ -4,7 +4,12 @@
  */
 
 import express, { Request, Response } from 'express';
-import { GoldenSignals, Recommendation } from './types.js';
+import {
+  GoldenSignals,
+  HardwareBleedReport,
+  Recommendation,
+  WorkloadEconomicsReport,
+} from './types.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -72,13 +77,13 @@ app.get('/api/v1/recommendations', (_req: Request, res: Response) => {
     },
     {
       recommendationId: 'rec_02',
-      workloadId: 'wl_llama3_70b_finetune',
-      category: 'nccl_overhead',
-      title: 'Mitigate NCCL Communication Overhead',
-      action: "Tune NCCL buffer sizes ('NCCL_BUFFSIZE=16777216') and enable gradient accumulation.",
-      potentialWeeklySavingsUsd: 319.0,
-      potentialMonthlySavingsUsd: 1381.0,
-      estimatedEfficiencyGainPct: 6.8,
+      workloadId: 'wl_customer_support',
+      category: 'model_routing',
+      title: 'Route Simple Inquiries to Efficient Frontier Model',
+      action: 'Route 73% of requests to cheaper model based on Pareto frontier eval.',
+      potentialWeeklySavingsUsd: 4067.0,
+      potentialMonthlySavingsUsd: 17430.0,
+      estimatedEfficiencyGainPct: 31.0,
       status: 'open',
       createdAt: new Date().toISOString(),
     },
@@ -86,7 +91,55 @@ app.get('/api/v1/recommendations', (_req: Request, res: Response) => {
   res.json(recs);
 });
 
-// GET /api/v1/waste
+// GET /api/v1/workloads/:id/waste
+app.get('/api/v1/workloads/:id/waste', (req: Request, res: Response) => {
+  const workloadId = req.params.id;
+  const report: WorkloadEconomicsReport = {
+    workloadId,
+    workloadName: workloadId === 'customer-support-agent' ? 'customer-support-agent' : `workload-${workloadId}`,
+    monthlySpendUsd: 84210.0,
+    potentialWasteUsd: 17430.0,
+    wastePercentage: 20.7,
+    topIssue: '42% of cost from researcher agent',
+    rootCause: 'Large prompt context + expensive model',
+    recommendation: 'Route 73% of requests to cheaper model',
+    expectedImpact: {
+      cost: '-31%',
+      latency: '-18%',
+      quality: '-0.4%',
+    },
+  };
+  res.json(report);
+});
+
+// GET /api/v1/hardware/waste
+app.get('/api/v1/hardware/waste', (req: Request, res: Response) => {
+  const traceId = (req.query.traceId as string) || '5664cdc8';
+  const accelerator = (req.query.accelerator as string) || 'h100';
+
+  const report: HardwareBleedReport = {
+    workloadName: 'finetune-7b-v3',
+    traceId,
+    accelerator: `8x ${accelerator.toUpperCase()}`,
+    numGpus: 8,
+    primaryBottleneck: 'Dataloader Starvation (CPU/IO Bound)',
+    bottleneckCategory: 'dataloader_starvation',
+    symptom: 'GPU SM active cycles dropped to 38.2% (idle stalls) while PCIe TX was idle (<400 MB/s)',
+    rootCause: 'Worker process I/O wait during mini-batch tensor assembly',
+    remediationAction: 'Increase DataLoader num_workers=8 and set pin_memory=True',
+    hourlyBleedUsd: 16.95,
+    weeklyBleedUsd: 2847.20,
+    monthlyBleedUsd: 12204.0,
+    expectedImpact: {
+      throughputGain: '+31%',
+      weeklyCostSavings: '$967.00',
+      wasteReduction: '-82%',
+    },
+  };
+  res.json(report);
+});
+
+// GET /api/v1/waste (Standard legacy endpoint)
 app.get('/api/v1/waste', (req: Request, res: Response) => {
   const accelerator = (req.query.accelerator as string) || 'h100';
   const gpus = parseInt((req.query.gpus as string) || '8', 10);
@@ -108,12 +161,26 @@ app.get('/api/v1/waste', (req: Request, res: Response) => {
       mfuPct: 48.5,
       efficiencyRating: 'Optimal',
     },
+    wasteComponents: [
+      {
+        category: 'framework_overhead',
+        displayName: 'PyTorch Eager-Mode Overhead',
+        wastePct: 12.0,
+        hourlyBleedUsd: 3.36,
+      },
+      {
+        category: 'nccl_overhead',
+        displayName: 'NCCL Communication Wait',
+        wastePct: 8.8,
+        hourlyBleedUsd: 2.46,
+      },
+    ],
   });
 });
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, () => {
-    console.log(`[airun-control-plane] Listening on port ${port}`);
+    console.log(`[airun-control-plane] Control plane API listening on port ${port}`);
   });
 }
 

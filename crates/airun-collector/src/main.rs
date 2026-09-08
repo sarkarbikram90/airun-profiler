@@ -1,11 +1,17 @@
-//! airun-collector: Production Rust DaemonSet agent for NVIDIA DCGM & Kubernetes GPU telemetry.
+//! airun-collector: Production Rust Real-Time Data Plane DaemonSet for NVIDIA DCGM & Kubernetes.
 
+mod circuit_breaker;
 mod dcgm;
+mod otlp;
 mod pubsub;
 
-use dcgm::DcgmScraper;
+use circuit_breaker::{CircuitBreaker, BreakerConfig};
+use dcgm::{DcgmScraper, TelemetryRingBuffer};
+use otlp::{OtlpSpan, SpanCorrelator};
 use pubsub::PubSubPublisher;
+use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::main]
@@ -21,17 +27,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(8);
 
     println!("============================================================");
-    println!("  airun-collector DaemonSet (Rust High-Throughput Data Plane)");
+    println!("  airun-collector (Rust Real-Time Data Plane Engine)");
     println!("============================================================");
-    println!("  * Node Name:    {}", node_name);
-    println!("  * Cluster ID:   {}", cluster_id);
-    println!("  * Accelerator:  {}x {}", num_gpus, accelerator_type);
-    println!("  * Pub/Sub:      projects/{}/topics/{}", project_id, pubsub_topic);
-    println!("  * Sample Rate:  1 Hz");
+    println!("  * Node Name:       {}", node_name);
+    println!("  * Cluster ID:      {}", cluster_id);
+    println!("  * Accelerator:     {}x {}", num_gpus, accelerator_type);
+    println!("  * Pub/Sub Topic:   projects/{}/topics/{}", project_id, pubsub_topic);
+    println!("  * In-Memory Buffer: 1,000 samples @ 10Hz ring buffer");
     println!("============================================================");
 
     let scraper = DcgmScraper::new(node_name.clone(), accelerator_type, num_gpus);
+    println!("  * Hardware Mode:   {:?}", scraper.mode());
+
+    let ring_buffer = Arc::new(TelemetryRingBuffer::new(1000));
     let publisher = PubSubPublisher::new(pubsub_topic, project_id);
+    let breaker = CircuitBreaker::new("openai-h100-pool".into(), Some(BreakerConfig::default()));
+
+    println!("  * Circuit Breaker: Initial state = {:?}", breaker.state());
 
     let mut count: u64 = 0;
     loop {
@@ -39,11 +51,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let batch_id = format!("batch_{}", count);
         let batch = scraper.collect_batch(&batch_id, &cluster_id);
 
+        // Feed local ring buffer for microsecond zero-overhead time-window correlation
+        ring_buffer.push_batch(batch.samples.clone());
+
+        // Stream batch to Pub/Sub backbone
         if let Err(e) = publisher.publish_telemetry_batch(&batch).await {
             eprintln!("[!] Telemetry push failed: {}", e);
         }
 
-        // 1-second scraping interval
+        // Example local trace span correlation check
+        if count == 1 {
+            let now = chrono::Utc::now();
+            let now_nano = (now.timestamp() as u64) * 1_000_000_000 + (now.timestamp_subsec_nanos() as u64);
+            let sample_span = OtlpSpan {
+                trace_id: "demo_trace_001".to_string(),
+                span_id: "span_101".to_string(),
+                name: "agent_researcher".to_string(),
+                start_time_unix_nano: now_nano.saturating_sub(200_000_000),
+                end_time_unix_nano: now_nano,
+                attributes: HashMap::new(),
+            };
+            let finding = SpanCorrelator::correlate_span(&sample_span, &ring_buffer);
+            println!(
+                "  * Local Correlation: Trace '{}' Span '{}' Duration: {:.2}ms (SM: {:.1}%, PCIe: {:.1} MB/s)",
+                finding.trace_id,
+                finding.span_name,
+                finding.duration_ms,
+                finding.hardware_analysis.avg_sm_util_pct,
+                finding.hardware_analysis.max_pcie_tx_mbs
+            );
+        }
+
+        // 1-second scraping interval for batch publishing
         tokio::time::sleep(Duration::from_secs(1)).await;
 
         // In test/demo environment, yield after 5 batches if running non-daemon

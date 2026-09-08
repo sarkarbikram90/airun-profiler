@@ -16,6 +16,7 @@ from rich.table import Table
 
 from airun.analysis.analyzer import analyze_spans
 from airun.analysis.comparator import compare_traces
+from airun.analysis.correlation import TimeWindowCorrelator
 from airun.analysis.waste import detect_compute_waste
 from airun.cli.formatting import (
     build_rich_tree,
@@ -27,10 +28,12 @@ from airun.cli.formatting import (
     render_executive_metrics_panel,
     render_findings_panel,
     render_golden_signals_panel,
+    render_hardware_bleed_panel,
     render_profiler_summary_panel,
     render_trace_summary_panel,
     render_traces_list_table,
     render_waste_analysis_panel,
+    render_workload_waste_panel,
 )
 from airun.events.models import SpanKind, SpanStatus
 from airun.exporters.json_export import export_trace_to_json
@@ -525,8 +528,30 @@ def waste(
         "h100", "--accelerator", "-a", help="Target accelerator (h100, a100, b200, etc.)."
     ),
     gpus: int = typer.Option(8, "--gpus", "-g", help="Number of GPUs in node pool."),
+    hardware: bool = typer.Option(
+        False, "--hardware", "-H", help="Display physical silicon hardware bleed diagnosis."
+    ),
+    workload: Optional[str] = typer.Option(
+        None, "--workload", "-w", help="Analyze workload-level economics and multi-agent spend."
+    ),
 ) -> None:
     """Detect the 4 Physical AI Compute Waste Bottlenecks and calculate real-time Financial Bleed."""
+    if workload:
+        console.print(
+            "\n",
+            render_workload_waste_panel(
+                workload_name=workload,
+                monthly_spend=84210.0,
+                potential_waste=17430.0,
+                top_issue="42% of cost from researcher agent",
+                root_cause="Large prompt context + expensive model",
+                recommendation="Route 73% of requests to cheaper model",
+                expected_impact={"Cost": "-31%", "Latency": "-18%", "Quality": "-0.4%"},
+            ),
+            "\n",
+        )
+        return
+
     store = get_trace_store()
     resolved_id = _resolve_trace_id(trace_id, store)
     record = store.get_trace(resolved_id)
@@ -534,6 +559,12 @@ def waste(
     if not record:
         console.print(f"[bold red]Trace '{trace_id}' not found.[/bold red]")
         raise typer.Exit(code=1)
+
+    if hardware:
+        correlator = TimeWindowCorrelator(accelerator=accelerator, num_gpus=gpus)
+        diagnosis = correlator.diagnose_trace(record)
+        console.print("\n", render_hardware_bleed_panel(diagnosis), "\n")
+        return
 
     summary = record.summary or analyze_spans(record.spans)
     report = detect_compute_waste(

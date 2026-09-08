@@ -37,8 +37,9 @@ impl PubSubPublisher {
         // Emulated delivery confirmation
         let msg_id = format!("msg_{}", chrono::Utc::now().timestamp_millis());
         println!(
-            "[airun-collector] Published {} GPU samples to Pub/Sub topic '{}' (batch: {}, len: {}B)",
+            "[airun-collector] Published {} GPU samples to project '{}' topic '{}' (batch: {}, len: {}B)",
             batch.samples.len(),
+            self.project_id,
             self.topic,
             batch.batch_id,
             json.len()
