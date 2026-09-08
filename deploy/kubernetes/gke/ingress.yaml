@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: airun-gke-ingress
+  namespace: default
+  labels:
+    app: airun
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "airun-static-ip"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: airun-service
+                port:
+                  number: 80

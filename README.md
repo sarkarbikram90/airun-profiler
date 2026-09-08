@@ -358,14 +358,23 @@ python examples/lab/run_all.py
 
 ---
 
-## Documentation & Campaign Links
+## Documentation & Deployment Guides
 
-- **Developer & AI Agent Guide**: [`agent.md`](agent.md)
-- **Milestone AIRUN-100 Charter**: [`validation/AIRUN-100.md`](validation/AIRUN-100.md)
-- **Campaign Outreach Playbook**: [`validation/outreach-playbook.md`](validation/outreach-playbook.md)
-- **Teardown Report Template**: [`validation/teardown-template.md`](validation/teardown-template.md)
-- **External Validation Kit**:
-  - [Validation Invitation](validation/invitation.md)
+- **Deployment Guides**:
+  - [Google Kubernetes Engine (GCP GKE) Deployment Guide](docs/gcp-gke-deployment-guide.md)
+  - [Amazon Elastic Kubernetes Service (AWS EKS) Deployment Guide](docs/aws-eks-deployment-guide.md)
+- **Technical Architecture & Specifications**:
+  - [System Architecture & Distributed Data Path](docs/architecture.md)
+  - [Master Product Specification (`spec.md`)](spec.md)
+  - [Developer & AI Agent Guide (`agent.md`)](agent.md)
+  - [5-Minute Quickstart Guide](docs/quickstart.md)
+  - [Pricing & Accelerator Energy Economics](docs/pricing.md)
+  - [Architecture Decision Records (ADRs)](docs/decision-log.md)
+  - [Automated Release & Publishing Runbook](docs/release-guide.md)
+- **External Validation Kit (AIRUN-100)**:
+  - [Milestone AIRUN-100 Charter](validation/AIRUN-100.md)
+  - [Campaign Outreach Playbook](validation/outreach-playbook.md)
+  - [Pipeline Teardown Template](validation/teardown-template.md)
   - [Quickstart Checklist](validation/quickstart-checklist.md)
   - [Feedback Form](validation/feedback-form.md)
   - [Friction Log](validation/results/friction-log.md)
