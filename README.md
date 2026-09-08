@@ -15,7 +15,9 @@
   <a href="crates/airun-collector"><img src="https://img.shields.io/badge/Rust-Data%20Plane-DEA584.svg?logo=rust&logoColor=black" alt="Rust Data Plane"></a>
   <a href="packages/control-plane"><img src="https://img.shields.io/badge/TypeScript-Control%20Plane-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript Control Plane"></a>
   <a href="https://developer.nvidia.com/dcgm"><img src="https://img.shields.io/badge/NVIDIA-DCGM%20%26%20NVML-76B900.svg?logo=nvidia&logoColor=white" alt="NVIDIA DCGM"></a>
-  <a href="deploy/kubernetes"><img src="https://img.shields.io/badge/Kubernetes-GKE%20DaemonSet-326CE5.svg?logo=kubernetes&logoColor=white" alt="Kubernetes"></a>
+  <a href="docs/gcp-gke-deployment-guide.md"><img src="https://img.shields.io/badge/Kubernetes-GKE%20DaemonSet-326CE5.svg?logo=kubernetes&logoColor=white" alt="GCP GKE"></a>
+  <a href="docs/aws-eks-deployment-guide.md"><img src="https://img.shields.io/badge/Kubernetes-EKS%20DaemonSet-FF9900.svg?logo=kubernetes&logoColor=white" alt="AWS EKS"></a>
+  <a href="docs/azure-aks-deployment-guide.md"><img src="https://img.shields.io/badge/Kubernetes-AKS%20DaemonSet-0078D4.svg?logo=kubernetes&logoColor=white" alt="Azure AKS"></a>
   <a href="deploy/helm/airun-data-plane"><img src="https://img.shields.io/badge/Helm-v3-0F1689.svg?logo=helm&logoColor=white" alt="Helm"></a>
   <a href="src/airun/exporters/otlp.py"><img src="https://img.shields.io/badge/OpenTelemetry-OTLP%20Native-F5A800.svg?logo=opentelemetry&logoColor=white" alt="OpenTelemetry"></a>
   <img src="https://img.shields.io/badge/Overhead-%3C20%CE%BCs-success.svg" alt="Overhead">
@@ -30,7 +32,9 @@
   <code>opentelemetry</code> • 
   <code>circuit-breakers</code> • 
   <code>disaster-recovery</code> • 
-  <code>gke-daemonset</code>
+  <code>gke-daemonset</code> • 
+  <code>eks-daemonset</code> • 
+  <code>aks-daemonset</code>
 </p>
 
 > **"airun measures and optimizes the cost, latency, quality, and reliability of AI workloads."**
@@ -252,7 +256,7 @@ airun compare previous latest
                └──────────────┬─────────────┘
                               │
 ┌─────────────────────────────▼────────────────────────────┐
-│                      GKE Kubernetes                      │
+│                GKE / EKS / AKS Kubernetes                │
 │             Production Execution Environment             │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -266,7 +270,7 @@ airun compare previous latest
 | **Python** (`src/airun`) | **Intelligence Plane & SDK** | Developer-facing `@trace` SDK, OTLP span exporter, Time-Window Correlation engine, Physics of AI Waste diagnostics, MFU calculator, and CLI. |
 | **PostgreSQL** (`deploy/postgres`) | **System of Record** | Source of truth for state, decisions, runs, policies, recommendations, and aggregated 1-minute rollups (never raw unaggregated telemetry). |
 | **Pub/Sub** | **Event Fabric** | High-throughput asynchronous event backbone for batched telemetry, run completions, and waste alerts. |
-| **GKE Kubernetes** (`deploy/kubernetes`, `deploy/helm`) | **Execution Environment** | Managed GPU node pools with `nvidia.com/gpu` tolerations and DaemonSets mounting `/var/run/nvidia-dcgm` and `/sys/fs/cgroup`. |
+| **Kubernetes (GKE / EKS / AKS)** (`deploy/kubernetes`, `deploy/helm`) | **Execution Environment** | Managed GPU node pools with `nvidia.com/gpu` tolerations and DaemonSets mounting `/var/run/nvidia-dcgm` and `/sys/fs/cgroup`. |
 
 ---
 
