@@ -1,6 +1,6 @@
 [package]
 name = "airun-collector"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["airun Contributors <infra@airun.dev>"]
 description = "High-throughput Rust node telemetry collector DaemonSet for NVIDIA DCGM & Kubernetes"
