@@ -2,6 +2,21 @@
 
 All notable changes to `airun` are documented in this file.
 
+## [0.1.4] - 2026-09-07
+
+### Added
+- **Distributed Pipeline Engine (`airun pipeline run`)**: Validates the complete 6-tier distributed data path (Python Workload -> Rust Collector -> Pub/Sub -> Python Analytics -> PostgreSQL -> TypeScript API).
+- **Standardized 10-Event Pub/Sub Backbone**: Codified distributed event schemas and envelopes across Python (`src/airun/events/pubsub.py`), Rust (`crates/airun-collector/src/pubsub.rs`), and TypeScript (`packages/control-plane/src/events.ts`):
+  - `workload.started`, `workload.completed`, `trace.created`, `gpu.alert`, `provider.degraded`, `provider.failed`, `dr.drill.started`, `dr.drill.completed`, `optimization.detected`, `optimization.applied`.
+- **The Commercial Wedge API & Scorecard**:
+  - `GET /api/v1/workloads/:id/cost-reliability` answering: *"What is my AI app costing me, where is it wasting money/latency, and what should I change?"*
+  - `POST /api/v1/recommendations/:id/apply` executing automated remediation with Pub/Sub event dispatch.
+  - `GET /api/v1/events` serving the distributed event feed.
+- **PyPI Discoverability & Presentation**:
+  - PEP 621 `[project.urls]` navigation buttons in PyPI sidebar (Homepage, Documentation, Repository, Issue Tracker, Changelog, Specification).
+  - High-intent search keywords (`nvidia-dcgm`, `gpu-optimization`, `finops`, `h100`, `mfu`, `cuda`, `pytorch-profiler`, `silicon-waste`).
+  - Trove classifiers and live download/star badges.
+
 ## [0.1.3] - 2026-09-07
 
 ### Added

@@ -2,7 +2,7 @@
 
 image:
   repository: ghcr.io/sarkarbikram90/airun-data-plane
-  tag: "0.1.3"
+  tag: "0.1.4"
   pullPolicy: IfNotPresent
 
 cluster:

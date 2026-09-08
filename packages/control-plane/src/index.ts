@@ -21,7 +21,7 @@ app.get('/healthz', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: '@airun/control-plane',
-    version: '0.1.3',
+    version: '0.1.4',
     timestamp: new Date().toISOString(),
   });
 });

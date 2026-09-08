@@ -15,7 +15,7 @@
 Observe → Explain → Optimize → Control → Automate
 ```
 - **v0.1.x**: **Observe & Explain** — Zero-overhead DAG tracing, token pricing engine, interval critical-path analysis, and severity-graded diagnostic findings.
-- **v0.1.3 (Current)**: **AI Infrastructure Reliability & Economics Platform** (as specified in `spec.md`):
+- **v0.1.4 (Current)**: **AI Infrastructure Reliability & Economics Platform** (as specified in `spec.md`):
   1. *Intelligence per Dollar (IPD) & Watt (IPW)* with hardware accelerator power modeling (H100, A100, B200, TPU).
   2. *The Efficient Frontier of AI & Eval-Driven Routing* with Pareto optimality and background shadow testing.
   3. *The AI Breaker Box & Automated Disaster Recovery (DR)* with Semantic Equivalence Mapping across providers.
