@@ -123,3 +123,6 @@ class OTLPSpanExporter:
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             logger.debug("OTLP export to %s failed (collector likely offline): %s", self.endpoint, e)
             return False
+
+    # Alias for API compatibility
+    export_trace = export

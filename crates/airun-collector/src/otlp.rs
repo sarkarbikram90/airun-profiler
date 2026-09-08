@@ -17,6 +17,46 @@ pub struct OtlpSpan {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OtlpPayload {
+    #[serde(rename = "resourceSpans", default)]
+    pub resource_spans: Vec<OtlpResourceSpan>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OtlpResourceSpan {
+    #[serde(rename = "scopeSpans", default)]
+    pub scope_spans: Vec<OtlpScopeSpan>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OtlpScopeSpan {
+    #[serde(default)]
+    pub spans: Vec<OtlpRawSpan>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OtlpRawSpan {
+    #[serde(rename = "traceId", default)]
+    pub trace_id: String,
+    #[serde(rename = "spanId", default)]
+    pub span_id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(rename = "startTimeUnixNano", default)]
+    pub start_time_unix_nano: String,
+    #[serde(rename = "endTimeUnixNano", default)]
+    pub end_time_unix_nano: String,
+    #[serde(default)]
+    pub attributes: Vec<OtlpRawAttribute>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OtlpRawAttribute {
+    pub key: String,
+    pub value: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorrelatedSpanFinding {
     pub trace_id: String,
     pub span_name: String,
@@ -29,6 +69,37 @@ pub struct CorrelatedSpanFinding {
 pub struct SpanCorrelator;
 
 impl SpanCorrelator {
+    /// Parses an incoming standard OTLP HTTP JSON payload into internal OtlpSpans.
+    pub fn parse_otlp_json(json_str: &str) -> Result<Vec<OtlpSpan>, String> {
+        let payload: OtlpPayload = serde_json::from_str(json_str)
+            .map_err(|e| format!("Failed to parse OTLP payload: {}", e))?;
+
+        let mut spans = Vec::new();
+        for rs in payload.resource_spans {
+            for ss in rs.scope_spans {
+                for s in ss.spans {
+                    let start_nano = s.start_time_unix_nano.parse::<u64>().unwrap_or(0);
+                    let end_nano = s.end_time_unix_nano.parse::<u64>().unwrap_or(0);
+                    let mut attrs = HashMap::new();
+                    for a in s.attributes {
+                        if let Some(val) = a.value {
+                            attrs.insert(a.key, val.to_string());
+                        }
+                    }
+                    spans.push(OtlpSpan {
+                        trace_id: s.trace_id,
+                        span_id: s.span_id,
+                        name: s.name,
+                        start_time_unix_nano: start_nano,
+                        end_time_unix_nano: end_nano,
+                        attributes: attrs,
+                    });
+                }
+            }
+        }
+        Ok(spans)
+    }
+
     /// Correlates a logical OTLP span with the high-frequency physical telemetry in the ring buffer.
     pub fn correlate_span(span: &OtlpSpan, ring_buffer: &TelemetryRingBuffer) -> CorrelatedSpanFinding {
         let start_secs = (span.start_time_unix_nano / 1_000_000_000) as i64;
@@ -92,5 +163,31 @@ mod tests {
         let finding = SpanCorrelator::correlate_span(&span, &rb);
         assert_eq!(finding.trace_id, "trace-999");
         assert_eq!(finding.span_name, "agent_researcher");
+    }
+
+    #[test]
+    fn test_parse_otlp_json() {
+        let sample_json = r#"{
+            "resourceSpans": [{
+                "resource": {"attributes": []},
+                "scopeSpans": [{
+                    "spans": [{
+                        "traceId": "tr_otlp_test",
+                        "spanId": "sp_otlp_1",
+                        "name": "agent_llm_step",
+                        "startTimeUnixNano": "1725700000000000000",
+                        "endTimeUnixNano": "1725700000150000000",
+                        "attributes": [{"key": "model", "value": "gpt-4o"}]
+                    }]
+                }]
+            }]
+        }"#;
+
+        let spans = SpanCorrelator::parse_otlp_json(sample_json).unwrap();
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].trace_id, "tr_otlp_test");
+        assert_eq!(spans[0].name, "agent_llm_step");
+        assert_eq!(spans[0].start_time_unix_nano, 1725700000000000000);
+        assert_eq!(spans[0].end_time_unix_nano, 1725700000150000000);
     }
 }

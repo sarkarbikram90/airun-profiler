@@ -6,7 +6,7 @@
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/dm/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="Downloads"></a>
   <a href="https://github.com/sarkarbikram90/airun-tracing"><img src="https://img.shields.io/github/stars/sarkarbikram90/airun-tracing?style=social" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/tests-88%20passed-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-92%20passed-brightgreen.svg" alt="Tests">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Ruff"></a>
 </p>
 
@@ -33,7 +33,7 @@
   <code>gke-daemonset</code>
 </p>
 
-> **"Automatically get the maximum intelligence per dollar and watt."**
+> **"airun measures and optimizes the cost, latency, quality, and reliability of AI workloads."**
 
 `airun` is a local-first **AI Infrastructure Reliability and Economics Platform** for Python 3.11+. It bridges the gap between physical silicon, data center electrical power, multi-model execution, and enterprise business continuity.
 

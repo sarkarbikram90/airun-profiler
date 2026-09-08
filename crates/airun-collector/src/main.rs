@@ -43,10 +43,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  * Hardware Mode:   {:?}", scraper.mode());
 
     let ring_buffer = Arc::new(TelemetryRingBuffer::new(1000));
-    let publisher = PubSubPublisher::new(pubsub_topic, project_id);
+    let publisher = PubSubPublisher::new(pubsub_topic.clone(), project_id.clone());
     let breaker = CircuitBreaker::new("openai-h100-pool".into(), Some(BreakerConfig::default()));
 
     println!("  * Circuit Breaker: Initial state = {:?}", breaker.state());
+
+    // Spawn high-throughput OTLP HTTP ingestion server on port 4318
+    let otlp_port: u16 = env::var("OTLP_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(4318);
+    let otlp_ring_buffer = Arc::clone(&ring_buffer);
+    tokio::spawn(async move {
+        let addr = format!("127.0.0.1:{}", otlp_port);
+        match tokio::net::TcpListener::bind(&addr).await {
+            Ok(listener) => {
+                println!("  * OTLP HTTP Receiver: listening on http://{}/v1/traces", addr);
+                loop {
+                    if let Ok((mut socket, _)) = listener.accept().await {
+                        let rb = Arc::clone(&otlp_ring_buffer);
+                        tokio::spawn(async move {
+                            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                            let mut buf = vec![0u8; 65536];
+                            if let Ok(n) = socket.read(&mut buf).await {
+                                if n > 0 {
+                                    let request = String::from_utf8_lossy(&buf[..n]);
+                                    if request.starts_with("POST /v1/traces") {
+                                        if let Some(body_idx) = request.find("\r\n\r\n") {
+                                            let body = &request[body_idx + 4..];
+                                            if let Ok(spans) = SpanCorrelator::parse_otlp_json(body) {
+                                                for span in &spans {
+                                                    let finding = SpanCorrelator::correlate_span(span, &rb);
+                                                    println!(
+                                                        "[airun-collector/otlp] Correlated Span: '{}' (Trace: '{}') -> {:.2}ms (SM: {:.1}%, PCIe: {:.1} MB/s, Bleed: {:?})",
+                                                        finding.span_name,
+                                                        finding.trace_id,
+                                                        finding.duration_ms,
+                                                        finding.hardware_analysis.avg_sm_util_pct,
+                                                        finding.hardware_analysis.max_pcie_tx_mbs,
+                                                        finding.hardware_analysis.detected_bottleneck
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        let response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 19\r\nConnection: close\r\n\r\n{\"status\":\"success\"}";
+                                        let _ = socket.write_all(response.as_bytes()).await;
+                                    } else {
+                                        let response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 15\r\nConnection: close\r\n\r\n{\"status\":\"ok\"}";
+                                        let _ = socket.write_all(response.as_bytes()).await;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[!] Could not bind OTLP HTTP receiver on port {}: {}", otlp_port, e);
+            }
+        }
+    });
 
     // Emit initial workload.started lifecycle event
     let start_payload = WorkloadLifecyclePayload {

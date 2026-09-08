@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from airun.events.models import SpanKind, TraceRecord, TraceSpan
 from airun.exporters.otlp import OTLPSpanExporter
 
@@ -47,3 +49,25 @@ def test_trace_to_otlp_payload() -> None:
     assert "resourceSpans" in payload
     assert len(payload["resourceSpans"]) == 1
     assert payload["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["name"] == "workflow_root"
+
+
+def test_trace_auto_exports_otlp(monkeypatch: pytest.MonkeyPatch) -> None:
+    exported_records = []
+
+    def mock_export(self: OTLPSpanExporter, record: TraceRecord) -> bool:
+        exported_records.append(record)
+        return True
+
+    monkeypatch.setattr(OTLPSpanExporter, "export", mock_export)
+    monkeypatch.setenv("AIRUN_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")
+
+    from airun.sdk.tracer import trace
+
+    @trace(name="otlp_test_step")
+    def run_step() -> int:
+        return 42
+
+    result = run_step()
+    assert result == 42
+    assert len(exported_records) == 1
+    assert exported_records[0].spans[0].name == "otlp_test_step"

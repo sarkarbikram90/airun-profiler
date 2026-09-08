@@ -146,6 +146,15 @@ class TraceContext:
                     p.parent.mkdir(parents=True, exist_ok=True)
                     with open(p, "w", encoding="utf-8") as f:
                         f.write(trace_id)
+
+                # OTLP Streaming to Rust Real-Time Data Plane or OTLP collector
+                if os.environ.get("AIRUN_OTLP_ENDPOINT") or os.environ.get("AIRUN_OTLP_ENABLED"):
+                    try:
+                        from airun.exporters.otlp import OTLPSpanExporter
+                        exporter = OTLPSpanExporter()
+                        exporter.export(record)
+                    except Exception as export_err:
+                        sys.stderr.write(f"[airun] OTLP export warning: {export_err}\n")
         except Exception as e:
             # Zero-crash guarantee: never fail host application
             sys.stderr.write(f"[airun] Error saving trace: {e}\n")
