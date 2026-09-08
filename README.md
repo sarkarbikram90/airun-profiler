@@ -1,9 +1,36 @@
 # AI Infrastructure Reliability & Economics Platform (`airun`)
 
-[![CI](https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml/badge.svg)](https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.3-blue.svg)](pyproject.toml)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
+<p align="center">
+  <a href="https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml"><img src="https://github.com/sarkarbikram90/airun-tracing/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/v/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.1.3-blue.svg" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
+  <img src="https://img.shields.io/badge/tests-88%20passed-brightgreen.svg" alt="Tests">
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Ruff"></a>
+</p>
+
+<p align="center">
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white" alt="Python"></a>
+  <a href="crates/airun-collector"><img src="https://img.shields.io/badge/Rust-Data%20Plane-DEA584.svg?logo=rust&logoColor=black" alt="Rust Data Plane"></a>
+  <a href="packages/control-plane"><img src="https://img.shields.io/badge/TypeScript-Control%20Plane-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript Control Plane"></a>
+  <a href="https://developer.nvidia.com/dcgm"><img src="https://img.shields.io/badge/NVIDIA-DCGM%20%26%20NVML-76B900.svg?logo=nvidia&logoColor=white" alt="NVIDIA DCGM"></a>
+  <a href="deploy/kubernetes"><img src="https://img.shields.io/badge/Kubernetes-GKE%20DaemonSet-326CE5.svg?logo=kubernetes&logoColor=white" alt="Kubernetes"></a>
+  <a href="deploy/helm/airun-data-plane"><img src="https://img.shields.io/badge/Helm-v3-0F1689.svg?logo=helm&logoColor=white" alt="Helm"></a>
+  <a href="src/airun/exporters/otlp.py"><img src="https://img.shields.io/badge/OpenTelemetry-OTLP%20Native-F5A800.svg?logo=opentelemetry&logoColor=white" alt="OpenTelemetry"></a>
+  <img src="https://img.shields.io/badge/Overhead-%3C20%CE%BCs-success.svg" alt="Overhead">
+</p>
+
+<p align="center">
+  <code>ai-infrastructure</code> • 
+  <code>gpu-finops</code> • 
+  <code>nvidia-dcgm</code> • 
+  <code>h100-sxm5</code> • 
+  <code>mfu-profiler</code> • 
+  <code>opentelemetry</code> • 
+  <code>circuit-breakers</code> • 
+  <code>disaster-recovery</code> • 
+  <code>gke-daemonset</code>
+</p>
 
 > **"Automatically get the maximum intelligence per dollar and watt."**
 
