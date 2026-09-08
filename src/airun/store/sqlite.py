@@ -24,13 +24,15 @@ class SQLiteTraceStore(TraceStore):
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=10.0)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
         return conn
 
     def _init_db(self) -> None:
-        conn = self._get_connection()
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn.row_factory = sqlite3.Row
         try:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
             with conn:
                 conn.executescript(
                     """
@@ -112,39 +114,42 @@ class SQLiteTraceStore(TraceStore):
                 # Delete old spans if re-saving trace
                 conn.execute("DELETE FROM spans WHERE trace_id = ?", (trace_record.trace_id,))
 
-                # Insert all spans
-                for order, span in enumerate(trace_record.spans):
-                    conn.execute(
-                        """
-                        INSERT INTO spans (
-                            span_id, trace_id, parent_id, name, kind, start_time, end_time,
-                            duration_ms, status, provider, model, tokens_input, tokens_output,
-                            cost_usd, retry_count, error_json, metadata_json, span_order
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            span.span_id,
-                            span.trace_id,
-                            span.parent_id,
-                            span.name,
-                            span.kind.value if hasattr(span.kind, "value") else str(span.kind),
-                            span.start_time,
-                            span.end_time,
-                            span.duration_ms,
-                            span.status.value
-                            if hasattr(span.status, "value")
-                            else str(span.status),
-                            span.provider,
-                            span.model,
-                            span.tokens_input,
-                            span.tokens_output,
-                            span.cost_usd,
-                            span.retry_count,
-                            json.dumps(span.error) if span.error else None,
-                            json.dumps(span.metadata) if span.metadata else "{}",
-                            order,
-                        ),
+                # Bulk insert all spans
+                span_rows = [
+                    (
+                        span.span_id,
+                        span.trace_id,
+                        span.parent_id,
+                        span.name,
+                        span.kind.value if hasattr(span.kind, "value") else str(span.kind),
+                        span.start_time,
+                        span.end_time,
+                        span.duration_ms,
+                        span.status.value
+                        if hasattr(span.status, "value")
+                        else str(span.status),
+                        span.provider,
+                        span.model,
+                        span.tokens_input,
+                        span.tokens_output,
+                        span.cost_usd,
+                        span.retry_count,
+                        json.dumps(span.error) if span.error else None,
+                        json.dumps(span.metadata) if span.metadata else "{}",
+                        order,
                     )
+                    for order, span in enumerate(trace_record.spans)
+                ]
+                conn.executemany(
+                    """
+                    INSERT INTO spans (
+                        span_id, trace_id, parent_id, name, kind, start_time, end_time,
+                        duration_ms, status, provider, model, tokens_input, tokens_output,
+                        cost_usd, retry_count, error_json, metadata_json, span_order
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    span_rows,
+                )
         finally:
             conn.close()
 
