@@ -35,6 +35,7 @@ from airun.cli.formatting import (
     render_waste_analysis_panel,
     render_workload_waste_panel,
 )
+from airun.cli.pipeline import pipeline_app
 from airun.events.models import SpanKind, SpanStatus
 from airun.exporters.json_export import export_trace_to_json
 from airun.exporters.otel_export import export_trace_to_otel
@@ -63,6 +64,7 @@ app.add_typer(trace_app, name="trace")
 app.add_typer(dr_app, name="dr")
 app.add_typer(breaker_app, name="breaker")
 app.add_typer(profiler_app, name="profiler")
+app.add_typer(pipeline_app, name="pipeline")
 
 
 console = Console()

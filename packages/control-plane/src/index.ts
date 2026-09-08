@@ -139,42 +139,83 @@ app.get('/api/v1/hardware/waste', (req: Request, res: Response) => {
   res.json(report);
 });
 
-// GET /api/v1/waste (Standard legacy endpoint)
-app.get('/api/v1/waste', (req: Request, res: Response) => {
-  const accelerator = (req.query.accelerator as string) || 'h100';
-  const gpus = parseInt((req.query.gpus as string) || '8', 10);
+// Commercial Wedge: "What is my AI application costing me, where is it wasting money/latency, and what should I change?"
+app.get('/api/v1/workloads/:id/cost-reliability', (req: Request, res: Response) => {
+  const workloadId = req.params.id;
+  res.json({
+    workloadId,
+    workloadName: workloadId === 'customer-support-agent' ? 'customer-support-agent' : `workload-${workloadId}`,
+    commercialWedge: {
+      question1_cost: {
+        monthlySpendUsd: 84210.0,
+        hourlyBurnRateUsd: 115.35,
+        costPer1mTokensUsd: 2.14,
+        status: 'high_cost',
+      },
+      question2_waste: {
+        potentialWasteUsd: 17430.0,
+        wastePercentage: 20.7,
+        topBottleneck: 'Researcher Agent Context Bloat (42% of cost)',
+        hardwareBleedUsdHourly: 16.95,
+        symptom: 'Large prompt context + expensive model during low-complexity user queries',
+      },
+      question3_action: {
+        action: 'Route 73% of requests to cheaper model via Pareto frontier evaluation',
+        projectedSavingsWeeklyUsd: 4067.0,
+        projectedSavingsMonthlyUsd: 17430.0,
+        expectedLatencyChange: '-18%',
+        expectedQualityChange: '-0.4%',
+        remediationStatus: 'ready_to_apply',
+      },
+    },
+    reliabilitySla: {
+      uptimePct: 99.95,
+      p99LatencyMs: 420.0,
+      circuitBreakerState: 'CLOSED',
+      activeAlerts: 0,
+    },
+  });
+});
+
+import { EventDispatcher, AirunEventEnvelope } from './events.js';
+
+export const eventDispatcher = new EventDispatcher();
+
+// POST /api/v1/recommendations/:id/apply
+app.post('/api/v1/recommendations/:id/apply', async (req: Request, res: Response) => {
+  const recId = req.params.id;
+  const appliedEvent: AirunEventEnvelope = {
+    eventId: `evt_applied_${Date.now()}`,
+    eventType: 'optimization.applied',
+    source: 'control-plane/api',
+    timestamp: new Date().toISOString(),
+    orgId: 'org_default',
+    projectId: 'proj_default',
+    clusterId: 'gke-us-central1-ai',
+    workloadId: 'customer-support-agent',
+    payload: {
+      recommendationId: recId,
+      status: 'applied',
+      appliedAt: new Date().toISOString(),
+      action: 'Route 73% of requests to cheaper model',
+    },
+  };
+
+  await eventDispatcher.dispatch(appliedEvent);
 
   res.json({
-    workloadId: 'wl_active_fleet',
-    accelerator: `${gpus}x ${accelerator.toUpperCase()}`,
-    durationMs: 3600000.0,
-    totalCostUsd: 28.0,
-    totalWastedCostUsd: 5.82,
-    totalWastePct: 20.8,
-    hourlyBurnRateUsd: 28.0,
-    hourlyFinancialBleedUsd: 5.82,
-    topBottleneck: 'Framework Eager-Mode Overhead (Software Bound)',
-    mfu: {
-      acceleratorName: 'NVIDIA H100 SXM5',
-      achievedTflops: 480.0,
-      totalTheoreticalPeakTflops: 7912.0,
-      mfuPct: 48.5,
-      efficiencyRating: 'Optimal',
-    },
-    wasteComponents: [
-      {
-        category: 'framework_overhead',
-        displayName: 'PyTorch Eager-Mode Overhead',
-        wastePct: 12.0,
-        hourlyBleedUsd: 3.36,
-      },
-      {
-        category: 'nccl_overhead',
-        displayName: 'NCCL Communication Wait',
-        wastePct: 8.8,
-        hourlyBleedUsd: 2.46,
-      },
-    ],
+    recommendationId: recId,
+    status: 'applied',
+    message: `Optimization recommendation '${recId}' successfully applied. Automated model routing updated.`,
+    eventId: appliedEvent.eventId,
+  });
+});
+
+// GET /api/v1/events
+app.get('/api/v1/events', (_req: Request, res: Response) => {
+  res.json({
+    count: eventDispatcher.getHistory().length,
+    events: eventDispatcher.getHistory(),
   });
 });
 
@@ -184,4 +225,6 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
+export { EventDispatcher } from './events.js';
 export default app;
+

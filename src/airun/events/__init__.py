@@ -14,6 +14,14 @@ from airun.events.models import (
     TraceSpan,
     TraceSummary,
 )
+from airun.events.pubsub import (
+    AirunEventEnvelope,
+    AirunEventType,
+    GpuAlertPayload,
+    OptimizationDetectedPayload,
+    PubSubEventBus,
+    WorkloadLifecyclePayload,
+)
 from airun.events.queue import DEFAULT_EVENT_QUEUE, EventMessage, EventQueue
 
 __all__ = [
@@ -32,4 +40,10 @@ __all__ = [
     "EventQueue",
     "EventMessage",
     "DEFAULT_EVENT_QUEUE",
+    "AirunEventType",
+    "AirunEventEnvelope",
+    "PubSubEventBus",
+    "WorkloadLifecyclePayload",
+    "GpuAlertPayload",
+    "OptimizationDetectedPayload",
 ]

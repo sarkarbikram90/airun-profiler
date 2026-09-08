@@ -8,7 +8,7 @@ mod pubsub;
 use circuit_breaker::{CircuitBreaker, BreakerConfig};
 use dcgm::{DcgmScraper, TelemetryRingBuffer};
 use otlp::{OtlpSpan, SpanCorrelator};
-use pubsub::PubSubPublisher;
+use pubsub::{AirunEventType, GpuAlertPayload, PubSubPublisher, WorkloadLifecyclePayload};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
@@ -17,6 +17,8 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node_name = env::var("NODE_NAME").unwrap_or_else(|_| "gke-gpu-node-default".to_string());
+    let pod_name = env::var("POD_NAME").unwrap_or_else(|_| "airun-collector-daemonset-4x8".to_string());
+    let pod_namespace = env::var("POD_NAMESPACE").unwrap_or_else(|_| "airun-system".to_string());
     let cluster_id = env::var("CLUSTER_ID").unwrap_or_else(|_| "us-central1-gke-prod".to_string());
     let pubsub_topic = env::var("PUBSUB_TOPIC").unwrap_or_else(|_| "ai-infrastructure-events".to_string());
     let project_id = env::var("GCP_PROJECT_ID").unwrap_or_else(|_| "airun-production".to_string());
@@ -30,13 +32,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  airun-collector (Rust Real-Time Data Plane Engine)");
     println!("============================================================");
     println!("  * Node Name:       {}", node_name);
+    println!("  * Pod Context:     {}/{}", pod_namespace, pod_name);
     println!("  * Cluster ID:      {}", cluster_id);
     println!("  * Accelerator:     {}x {}", num_gpus, accelerator_type);
     println!("  * Pub/Sub Topic:   projects/{}/topics/{}", project_id, pubsub_topic);
     println!("  * In-Memory Buffer: 1,000 samples @ 10Hz ring buffer");
     println!("============================================================");
 
-    let scraper = DcgmScraper::new(node_name.clone(), accelerator_type, num_gpus);
+    let scraper = DcgmScraper::new(node_name.clone(), accelerator_type.clone(), num_gpus);
     println!("  * Hardware Mode:   {:?}", scraper.mode());
 
     let ring_buffer = Arc::new(TelemetryRingBuffer::new(1000));
@@ -44,6 +47,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let breaker = CircuitBreaker::new("openai-h100-pool".into(), Some(BreakerConfig::default()));
 
     println!("  * Circuit Breaker: Initial state = {:?}", breaker.state());
+
+    // Emit initial workload.started lifecycle event
+    let start_payload = WorkloadLifecyclePayload {
+        workload_name: "customer-support-agent".to_string(),
+        workload_type: "agent".to_string(),
+        node_id: node_name.clone(),
+        pid: Some(std::process::id()),
+        duration_ms: None,
+        status: "running".to_string(),
+    };
+    if let Err(e) = publisher.publish_event(
+        AirunEventType::WorkloadStarted,
+        &format!("airun-collector/{}", node_name),
+        Some("wl_customer_support".to_string()),
+        None,
+        start_payload,
+    ).await {
+        eprintln!("[!] Failed to publish workload.started: {}", e);
+    }
 
     let mut count: u64 = 0;
     loop {
@@ -53,6 +75,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Feed local ring buffer for microsecond zero-overhead time-window correlation
         ring_buffer.push_batch(batch.samples.clone());
+
+        // Check for GPU thermal/PCIe anomaly and trigger gpu.alert
+        for sample in &batch.samples {
+            if sample.temperature_c > 82.0 || sample.pcie_errors > 0 {
+                let alert = GpuAlertPayload {
+                    node_id: node_name.clone(),
+                    gpu_index: sample.gpu_id,
+                    accelerator: accelerator_type.clone(),
+                    alert_type: if sample.temperature_c > 82.0 {
+                        "thermal_throttling".to_string()
+                    } else {
+                        "pcie_degradation".to_string()
+                    },
+                    severity: "warning".to_string(),
+                    description: format!(
+                        "Hardware anomaly on GPU {}: Temp={:.1}C, PCIe Errors={}",
+                        sample.gpu_id, sample.temperature_c, sample.pcie_errors
+                    ),
+                    metric_value: sample.temperature_c as f64,
+                    threshold_value: 82.0,
+                    hourly_financial_bleed_usd: 8.50,
+                };
+                let _ = publisher.publish_event(
+                    AirunEventType::GpuAlert,
+                    &format!("airun-collector/{}", node_name),
+                    None,
+                    None,
+                    alert,
+                ).await;
+            }
+        }
 
         // Stream batch to Pub/Sub backbone
         if let Err(e) = publisher.publish_telemetry_batch(&batch).await {

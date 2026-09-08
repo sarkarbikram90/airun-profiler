@@ -1,7 +1,7 @@
 """Analysis package."""
 
-from airun.analysis.analyzer import analyze_spans
-from airun.analysis.comparator import StepDiff, TraceComparison, compare_traces
+from airun.analysis.correlation import HardwareWasteDiagnosis, TimeWindowCorrelator
+from airun.analysis.pipeline import DistributedPipelineEngine
 from airun.analysis.waste import (
     MFUReport,
     WasteAnalysisReport,
@@ -22,4 +22,7 @@ __all__ = [
     "WasteComponent",
     "WasteAnalysisReport",
     "MFUReport",
+    "TimeWindowCorrelator",
+    "HardwareWasteDiagnosis",
+    "DistributedPipelineEngine",
 ]
