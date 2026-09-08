@@ -3,6 +3,8 @@
 <p align="center">
   <a href="https://github.com/sarkarbikram90/airun-profiler/actions/workflows/ci.yml"><img src="https://github.com/sarkarbikram90/airun-profiler/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/v/airun-profiler?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
+  <a href="https://crates.io/crates/airun-collector"><img src="https://img.shields.io/crates/v/airun-collector.svg?color=orange&logo=rust&logoColor=white" alt="crates.io"></a>
+  <a href="https://docs.rs/airun-collector"><img src="https://img.shields.io/docsrs/airun-collector?logo=docs.rs" alt="docs.rs"></a>
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/dm/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="Downloads"></a>
   <a href="https://github.com/sarkarbikram90/airun-profiler"><img src="https://img.shields.io/github/stars/sarkarbikram90/airun-profiler?style=social" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
@@ -68,7 +70,11 @@
 ### 1. Installation
 
 ```bash
+# Python SDK & CLI (PyPI)
 pip install airun-profiler
+
+# Rust Real-Time Node Telemetry Collector (crates.io)
+cargo install airun-collector
 ```
 
 ### 2. Environment Health Check
@@ -265,7 +271,7 @@ airun compare previous latest
 
 | Layer / Technology | Durable Role | Core Responsibilities |
 |---|---|---|
-| **Rust** (`crates/airun-collector`) | **Real-Time Data Plane** | Node/cluster telemetry collector, high-frequency GPU telemetry (DCGM/NVML), in-memory ring buffer (10Hz / 100ms), OTLP span ingestion, critical-path DAG engine, tri-state circuit breaker runtime. |
+| **Rust** ([`crates/airun-collector`](crates/airun-collector), [crates.io](https://crates.io/crates/airun-collector)) | **Real-Time Data Plane** | Node/cluster telemetry collector, high-frequency GPU telemetry (DCGM/NVML), in-memory ring buffer (10Hz / 100ms), OTLP span ingestion, critical-path DAG engine, tri-state circuit breaker runtime. |
 | **TypeScript** (`packages/control-plane`) | **Control Plane** | REST/gRPC API gateway, authentication/RBAC, organizations, projects, cluster configurations, billing, policies, and executive dashboard. |
 | **Python** (`src/airun`) | **Intelligence Plane & SDK** | Developer-facing `@trace` SDK, OTLP span exporter, Time-Window Correlation engine, Physics of AI Waste diagnostics, MFU calculator, and CLI. |
 | **PostgreSQL** (`deploy/postgres`) | **System of Record** | Source of truth for state, decisions, runs, policies, recommendations, and aggregated 1-minute rollups (never raw unaggregated telemetry). |
