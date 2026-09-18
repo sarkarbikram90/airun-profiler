@@ -1,6 +1,6 @@
 [package]
 name = "airun-collector"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["airun Contributors <infra@airun.dev>"]
 description = "High-throughput Rust node telemetry collector DaemonSet for NVIDIA DCGM & Kubernetes"
@@ -11,6 +11,14 @@ documentation = "https://docs.rs/airun-collector"
 readme = "README.md"
 keywords = ["kubernetes", "nvidia", "dcgm", "finops", "telemetry"]
 categories = ["command-line-utilities", "development-tools::profiling"]
+
+[lib]
+name = "airun_collector"
+path = "src/lib.rs"
+
+[[bin]]
+name = "airun-collector"
+path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }

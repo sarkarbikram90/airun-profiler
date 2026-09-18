@@ -1,16 +1,10 @@
 //! airun-collector: Production Rust Real-Time Data Plane DaemonSet for NVIDIA DCGM & Kubernetes.
 
-mod circuit_breaker;
-mod dcgm;
-mod ebpf;
-mod otlp;
-mod prometheus;
-mod pubsub;
-
-use circuit_breaker::{CircuitBreaker, BreakerConfig};
-use dcgm::{DcgmScraper, TelemetryRingBuffer};
-use otlp::{OtlpSpan, SpanCorrelator};
-use pubsub::{AirunEventType, GpuAlertPayload, PubSubPublisher, WorkloadLifecyclePayload};
+use airun_collector::circuit_breaker::{BreakerConfig, CircuitBreaker};
+use airun_collector::dcgm::{DcgmScraper, TelemetryRingBuffer};
+use airun_collector::format_prometheus_metrics;
+use airun_collector::otlp::{OtlpSpan, SpanCorrelator};
+use airun_collector::pubsub::{AirunEventType, GpuAlertPayload, PubSubPublisher, WorkloadLifecyclePayload};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
@@ -75,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 if n > 0 {
                                     let request = String::from_utf8_lossy(&buf[..n]);
                                     if request.starts_with("GET /metrics") || request.starts_with("GET / ") {
-                                        let body = prometheus::format_prometheus_metrics(&rb, &n_name, &a_type);
+                                        let body = format_prometheus_metrics(&rb, &n_name, &a_type);
                                         let resp = format!(
                                             "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                                             body.len(),
