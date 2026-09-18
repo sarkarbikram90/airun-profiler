@@ -54,7 +54,7 @@ from airun.sdk.tracer import (
 from airun.sdk.wrappers import wrap_openai_client
 from airun.store import get_trace_store
 
-__version__ = "0.1.4"
+__version__ = "0.1.6"
 
 __all__ = [
     "trace",
