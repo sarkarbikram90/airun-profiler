@@ -111,3 +111,125 @@ def test_server_frontier_and_resilience_endpoints():
         handler.send_response.assert_called_with(200)
         output = handler.wfile.getvalue().decode("utf-8")
         assert len(output) > 10
+
+
+def test_server_prometheus_metrics_endpoint():
+    """Verify /metrics returns standard Prometheus plain text metrics."""
+    handler = AirunServerHandler.__new__(AirunServerHandler)
+    handler.path = "/metrics"
+    handler.rfile = io.BytesIO()
+    handler.wfile = io.BytesIO()
+    handler.headers = {}
+    handler.command = "GET"
+
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+
+    handler.do_GET()
+
+    handler.send_response.assert_called_with(200)
+    output = handler.wfile.getvalue().decode("utf-8")
+    assert "# HELP airun_traces_total" in output
+    assert "# TYPE airun_traces_total counter" in output
+    assert "airun_cost_usd_total" in output
+    assert "airun_tokens_total" in output
+    assert "airun_circuit_breaker_state" in output
+
+
+def test_server_otlp_ingestion_endpoint():
+    """Verify POST /v1/traces parses OTLP payload and saves to store."""
+    import json
+
+    payload = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "tr-otlp-server-test",
+                                "spanId": "span-1",
+                                "name": "llm_query",
+                                "startTimeUnixNano": "1710000000000000000",
+                                "endTimeUnixNano": "1710000000100000000",
+                                "attributes": [
+                                    {"key": "model", "value": {"stringValue": "gpt-4o-mini"}},
+                                    {"key": "tokens.input", "value": {"intValue": 500}},
+                                    {"key": "tokens.output", "value": {"intValue": 100}},
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
+    body = json.dumps(payload).encode("utf-8")
+    handler = AirunServerHandler.__new__(AirunServerHandler)
+    handler.path = "/v1/traces"
+    handler.rfile = io.BytesIO(body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.command = "POST"
+
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+
+    handler.do_POST()
+
+    handler.send_response.assert_called_with(200)
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert output["status"] == "success"
+    assert "tr-otlp-server-test" in output["ingested"]
+
+
+def test_server_live_sse_stream_endpoint():
+    """Verify GET /api/live/stream returns SSE telemetry format."""
+    handler = AirunServerHandler.__new__(AirunServerHandler)
+    handler.path = "/api/live/stream"
+    handler.rfile = io.BytesIO()
+    handler.wfile = io.BytesIO()
+    handler.headers = {}
+    handler.command = "GET"
+
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+
+    handler.do_GET()
+
+    handler.send_response.assert_called_with(200)
+    output = handler.wfile.getvalue().decode("utf-8")
+    assert output.startswith("data: ")
+    assert "heartbeat" in output
+
+
+def test_server_demo_seeding_endpoint():
+    """Verify POST /api/demo seeds realistic example AI workloads."""
+    import json
+
+    handler = AirunServerHandler.__new__(AirunServerHandler)
+    handler.path = "/api/demo"
+    handler.rfile = io.BytesIO()
+    handler.wfile = io.BytesIO()
+    handler.headers = {}
+    handler.command = "POST"
+
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+
+    handler.do_POST()
+
+    handler.send_response.assert_called_with(200)
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert output["status"] == "success"
+    assert output["count"] == 4
+    assert len(output["trace_ids"]) == 4
+
+
+
+

@@ -359,4 +359,40 @@ mod tests {
         assert_eq!(analysis.sample_count, 1);
         assert_eq!(analysis.detected_bottleneck, Some("dataloader_starvation".to_string()));
     }
+
+    #[test]
+    fn test_ring_buffer_high_throughput() {
+        let capacity = 5_000;
+        let rb = TelemetryRingBuffer::new(capacity);
+        let sample = Dcgmsample {
+            timestamp: Utc::now().to_rfc3339(),
+            gpu_id: 0,
+            node_name: "node-bench".into(),
+            sm_util_pct: 85.0,
+            memory_used_mb: 40000.0,
+            memory_total_mb: 80000.0,
+            temperature_c: 62.0,
+            power_watts: 550.0,
+            pcie_tx_bytes_sec: 1_000_000.0,
+            pcie_rx_bytes_sec: 500_000.0,
+            pcie_errors: 0,
+            nvlink_throughput_mb_sec: 50_000.0,
+            nccl_barrier_wait_ms: 1.0,
+            cpu_util_pct: 25.0,
+            xid_errors: vec![],
+        };
+
+        let num_samples = 100_000;
+        let start = std::time::Instant::now();
+        for _ in 0..num_samples {
+            rb.push(sample.clone());
+        }
+        let elapsed = start.elapsed();
+
+        assert_eq!(rb.len(), capacity);
+        let throughput = num_samples as f64 / elapsed.as_secs_f64();
+        // Ring buffer must exceed 500k ops/sec easily on standard CPUs
+        assert!(throughput > 500_000.0, "Throughput was {:.0} ops/sec", throughput);
+    }
 }
+

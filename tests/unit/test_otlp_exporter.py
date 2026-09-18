@@ -71,3 +71,57 @@ def test_trace_auto_exports_otlp(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result == 42
     assert len(exported_records) == 1
     assert exported_records[0].spans[0].name == "otlp_test_step"
+
+
+def test_otlp_payload_to_trace_records_roundtrip() -> None:
+    from airun.exporters.otlp import otlp_payload_to_trace_records
+
+    raw_payload = {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": "external-llm-service"}},
+                        {"key": "airun.trace_id", "value": {"stringValue": "tr-otlp-999"}},
+                    ]
+                },
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "tr-otlp-999",
+                                "spanId": "span-root-01",
+                                "name": "chat_completion",
+                                "startTimeUnixNano": "1710000000000000000",
+                                "endTimeUnixNano": "1710000000250000000",
+                                "attributes": [
+                                    {"key": "model", "value": {"stringValue": "gpt-4o"}},
+                                    {"key": "provider", "value": {"stringValue": "openai"}},
+                                    {"key": "tokens.input", "value": {"intValue": 1500}},
+                                    {"key": "tokens.output", "value": {"intValue": 350}},
+                                    {"key": "cost.usd", "value": {"doubleValue": 0.00725}},
+                                ],
+                                "status": {"code": 1},
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+
+    records = otlp_payload_to_trace_records(raw_payload)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec.trace_id == "tr-otlp-999"
+    assert len(rec.spans) == 1
+    span = rec.spans[0]
+    assert span.name == "chat_completion"
+    assert span.model == "gpt-4o"
+    assert span.tokens_input == 1500
+    assert span.tokens_output == 350
+    assert span.cost_usd == 0.00725
+    assert span.duration_ms == 250.0
+    assert rec.summary is not None
+    assert rec.summary.total_cost_usd == 0.00725
+

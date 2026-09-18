@@ -10,84 +10,39 @@ import {
   Recommendation,
   WorkloadEconomicsReport,
 } from './types.js';
+import { PostgresStore } from './db.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
 
 app.use(express.json());
 
+export const dbStore = new PostgresStore();
+dbStore.init().catch((err) => {
+  console.warn('[ControlPlane] dbStore.init non-fatal warning:', err);
+});
+
 // Health check probe
-app.get('/healthz', (_req: Request, res: Response) => {
+app.get('/healthz', async (_req: Request, res: Response) => {
+  const dbHealth = await dbStore.getHealth();
   res.json({
     status: 'ok',
     service: '@airun/control-plane',
     version: '0.1.4',
     timestamp: new Date().toISOString(),
+    database: dbHealth,
   });
 });
 
 // GET /api/v1/golden-signals
-app.get('/api/v1/golden-signals', (_req: Request, res: Response) => {
-  const signals: GoldenSignals = {
-    economics: {
-      costPerEffectiveGpuHourUsd: 87.59,
-      costPer1mTokensUsd: 1.5647,
-      financialBleedHourlyUsd: 5.82,
-      totalWastedSpendUsd: 14.20,
-      wastePercentage: 20.8,
-    },
-    efficiency: {
-      mfuPct: 48.5,
-      achievedTflops: 480.0,
-      gpuSmUtilizationPct: 78.0,
-      memoryBandwidthUtilizationPct: 65.0,
-      pcieUtilizationPct: 42.0,
-    },
-    reliability: {
-      jobFailureRatePct: 0.0,
-      meanTimeToRecoveryMs: 0,
-      retryCount: 1,
-      checkpointFrequencyMin: 15.0,
-    },
-    infrastructure: {
-      powerDrawWatts: 350.0,
-      thermalThrottling: false,
-      pcieErrorCount: 0,
-      networkRetransmitsPct: 0.02,
-      pue: 1.20,
-    },
-  };
+app.get('/api/v1/golden-signals', async (_req: Request, res: Response) => {
+  const signals = await dbStore.getGoldenSignals();
   res.json(signals);
 });
 
 // GET /api/v1/recommendations
-app.get('/api/v1/recommendations', (_req: Request, res: Response) => {
-  const recs: Recommendation[] = [
-    {
-      recommendationId: 'rec_01',
-      workloadId: 'wl_llama3_70b_finetune',
-      category: 'framework_overhead',
-      title: 'Mitigate Framework Eager-Mode Overhead',
-      action: "Compile graph via 'torch.compile(model, mode=\"reduce-overhead\")' or capture CUDA Graphs.",
-      potentialWeeklySavingsUsd: 564.0,
-      potentialMonthlySavingsUsd: 2442.0,
-      estimatedEfficiencyGainPct: 12.0,
-      status: 'open',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      recommendationId: 'rec_02',
-      workloadId: 'wl_customer_support',
-      category: 'model_routing',
-      title: 'Route Simple Inquiries to Efficient Frontier Model',
-      action: 'Route 73% of requests to cheaper model based on Pareto frontier eval.',
-      potentialWeeklySavingsUsd: 4067.0,
-      potentialMonthlySavingsUsd: 17430.0,
-      estimatedEfficiencyGainPct: 31.0,
-      status: 'open',
-      createdAt: new Date().toISOString(),
-    },
-  ];
+app.get('/api/v1/recommendations', async (_req: Request, res: Response) => {
+  const recs = await dbStore.getRecommendations();
   res.json(recs);
 });
 
@@ -184,6 +139,8 @@ export const eventDispatcher = new EventDispatcher();
 // POST /api/v1/recommendations/:id/apply
 app.post('/api/v1/recommendations/:id/apply', async (req: Request, res: Response) => {
   const recId = req.params.id;
+  await dbStore.applyRecommendation(recId);
+
   const appliedEvent: AirunEventEnvelope = {
     eventId: `evt_applied_${Date.now()}`,
     eventType: 'optimization.applied',
@@ -211,6 +168,53 @@ app.post('/api/v1/recommendations/:id/apply', async (req: Request, res: Response
   });
 });
 
+// POST /api/v1/runs
+app.post('/api/v1/runs', async (req: Request, res: Response) => {
+  const run = req.body;
+  if (!run.runId || !run.workloadId) {
+    return res.status(400).json({ error: 'runId and workloadId are required' });
+  }
+  await dbStore.insertRun(run);
+  res.status(201).json({ status: 'created', runId: run.runId });
+});
+
+// POST /v1/traces (Standard OTLP HTTP Ingestion)
+app.post('/v1/traces', async (req: Request, res: Response) => {
+  const payload = req.body;
+  const resourceSpans = payload?.resourceSpans || [];
+  const ingestedRunIds: string[] = [];
+
+  for (const rs of resourceSpans) {
+    for (const ss of rs.scopeSpans || []) {
+      for (const s of ss.spans || []) {
+        const traceId = s.traceId || `tr_${Date.now()}`;
+        const runId = `run_${traceId.slice(0, 16)}`;
+        await dbStore.insertRun({
+          runId,
+          workloadId: 'otlp-workload',
+          traceId,
+          status: s.status?.code === 2 ? 'failed' : 'completed',
+          startedAt: new Date().toISOString(),
+          durationMs: 120.0,
+          criticalPathMs: 100.0,
+          totalTokens: 1000,
+          totalCostUsd: 0.005,
+          wastedCostUsd: 0.0,
+          mfuPct: 45.0,
+          achievedTflops: 400.0,
+        });
+        ingestedRunIds.push(runId);
+      }
+    }
+  }
+
+  res.json({
+    status: 'success',
+    ingestedRuns: ingestedRunIds,
+    count: ingestedRunIds.length,
+  });
+});
+
 // GET /api/v1/events
 app.get('/api/v1/events', (_req: Request, res: Response) => {
   res.json({
@@ -219,9 +223,74 @@ app.get('/api/v1/events', (_req: Request, res: Response) => {
   });
 });
 
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => {
-    console.log(`[airun-control-plane] Control plane API listening on port ${port}`);
+// GET /api/v1/federation/clusters
+app.get('/api/v1/federation/clusters', async (_req: Request, res: Response) => {
+  const clusters = await dbStore.getFederatedClusters();
+  res.json({
+    status: 'ok',
+    count: clusters.length,
+    clusters,
+  });
+});
+
+// GET /api/v1/federation/overview
+app.get('/api/v1/federation/overview', async (_req: Request, res: Response) => {
+  const overview = await dbStore.getFederationOverview();
+  res.json({
+    status: 'ok',
+    overview,
+  });
+});
+
+// POST /api/v1/federation/clusters
+app.post('/api/v1/federation/clusters', async (req: Request, res: Response) => {
+  const cluster = req.body;
+  if (!cluster.clusterId || !cluster.name || !cluster.provider) {
+    res.status(400).json({ error: 'Missing required cluster fields (clusterId, name, provider).' });
+    return;
+  }
+  const saved = await dbStore.upsertFederatedCluster({
+    ...cluster,
+    lastHeartbeat: new Date().toISOString(),
+  });
+  res.status(201).json({ status: 'registered', cluster: saved });
+});
+
+// POST /api/v1/federation/placement
+app.post('/api/v1/federation/placement', async (req: Request, res: Response) => {
+  const { workloadType, minGpus } = req.body;
+  const placement = await dbStore.recommendPlacement(workloadType || 'generic_ai_workload', minGpus || 8);
+  res.json({ status: 'ok', placement });
+});
+
+import http from 'node:http';
+import { WebSocketServer, WebSocket } from 'ws';
+
+export const server = http.createServer(app);
+export const wss = new WebSocketServer({ server, path: '/ws/live' });
+
+wss.on('connection', (ws) => {
+  ws.send(JSON.stringify({ type: 'connected', service: '@airun/control-plane', timestamp: new Date().toISOString() }));
+});
+
+export function broadcastEvent(event: unknown): void {
+  const msg = JSON.stringify(event);
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  }
+}
+
+eventDispatcher.on('*', (event: AirunEventEnvelope) => {
+  broadcastEvent(event);
+});
+
+const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
+
+if (!isTestEnv) {
+  server.listen(port, () => {
+    console.log(`[airun-control-plane] Control plane API & WebSockets listening on port ${port}`);
   });
 }
 

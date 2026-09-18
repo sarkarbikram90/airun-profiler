@@ -7,8 +7,8 @@ on:
     branches: [ main, master ]
 
 jobs:
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  test-python:
+    name: Test Python (${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -50,3 +50,50 @@ jobs:
           airun doctor
           airun demo
           airun report latest
+
+  test-rust:
+    name: Test Rust (Collector DaemonSet)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/airun-collector
+
+      - name: Clippy Check
+        run: cargo clippy --manifest-path crates/airun-collector/Cargo.toml -- -D warnings
+
+      - name: Run Rust Tests
+        run: cargo test --manifest-path crates/airun-collector/Cargo.toml --verbose
+
+  test-typescript:
+    name: Test TypeScript (Control Plane)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: packages/control-plane/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: packages/control-plane
+        run: npm ci
+
+      - name: Build & Run Tests
+        working-directory: packages/control-plane
+        run: |
+          npm run build
+          npm test

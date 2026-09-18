@@ -34,6 +34,6 @@ Thank you for your interest in contributing to `airun`!
 
 ## Pull Request Guidelines
 
-- Ensure all Python unit/integration tests (93 tests), Rust collector tests (6 tests), and TypeScript typechecks pass before opening a PR.
+- Ensure all Python unit/integration tests (110 tests), Rust collector tests (10 tests), and TypeScript tests (7 tests) pass before opening a PR.
 - Preserve the **Zero-Crash Guarantee** on SDK entry points: profiling errors must never fail host workloads.
 - Maintain **Privacy-by-Default**: never capture raw prompt/completion text without explicit user configuration, and auto-redact secrets.

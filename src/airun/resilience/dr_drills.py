@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,7 @@ class DRDrillReport(BaseModel):
     quality_retention_pct: float
     tool_conversion_success: bool
     actionable_recommendations: List[str] = Field(default_factory=list)
+    drill_mode: str = "simulated_catalog"  # "simulated_catalog" or "live_executed"
 
 
 def run_disaster_recovery_drill(
@@ -56,6 +57,8 @@ def run_disaster_recovery_drill(
     fault_type: str = "outage_500",  # "outage_500", "latency_spike", "quality_collapse"
     primary_model: Optional[str] = None,
     fallback_model: Optional[str] = None,
+    execute_live: bool = False,
+    live_executor: Optional[Callable[[str, str, List[Dict[str, Any]], Dict[str, Any]], Any]] = None,
 ) -> DRDrillReport:
     """
     Executes an automated synthetic Disaster Recovery drill.
@@ -140,6 +143,21 @@ def run_disaster_recovery_drill(
     )
 
     # Step 3: Compute Economic and Operational Deltas
+    recommendations: List[str] = []
+    drill_mode = "simulated_catalog"
+    if execute_live:
+        drill_mode = "live_executed"
+        if live_executor:
+            try:
+                import time
+
+                t0 = time.perf_counter()
+                live_executor(fallback_provider, fallback_model, converted_msgs, converted_tool)
+                f_latency = (time.perf_counter() - t0) * 1000.0
+            except Exception as e:
+                tool_conversion_ok = False
+                recommendations.append(f"Live execution error on fallback {fallback_provider}: {e}")
+
     cost_delta_pct = ((f_cost - p_cost) / p_cost * 100.0) if p_cost > 0 else 0.0
     latency_delta_ms = f_latency - p_latency
     quality_retention_pct = (f_quality / p_quality * 100.0) if p_quality > 0 else 100.0
@@ -147,7 +165,6 @@ def run_disaster_recovery_drill(
     # Step 4: Continuity Verdict and Recommendations
     continuity_ok = circuit_tripped and tool_conversion_ok and quality_retention_pct >= 90.0
 
-    recommendations: List[str] = []
     if cost_delta_pct > 15.0:
         recommendations.append(
             f"Failover increases token spend by +{cost_delta_pct:.1f}%: consider pairing with rate-limiting on non-essential workloads during outages."
@@ -192,4 +209,5 @@ def run_disaster_recovery_drill(
         quality_retention_pct=round(quality_retention_pct, 1),
         tool_conversion_success=tool_conversion_ok,
         actionable_recommendations=recommendations,
+        drill_mode=drill_mode,
     )

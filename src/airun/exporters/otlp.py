@@ -12,9 +12,17 @@ import logging
 import os
 import urllib.error
 import urllib.request
+import uuid
 from typing import Any
 
-from airun.events.models import TraceRecord, TraceSpan
+from airun.events.models import (
+    SpanKind,
+    SpanStatus,
+    TraceRecord,
+    TraceSpan,
+    TraceSummary,
+)
+from airun.pricing import calculate_cost
 
 logger = logging.getLogger("airun.exporters.otlp")
 
@@ -126,3 +134,161 @@ class OTLPSpanExporter:
 
     # Alias for API compatibility
     export_trace = export
+
+
+def _extract_attr_value(val: Any) -> Any:
+    if isinstance(val, dict):
+        for key in ("stringValue", "intValue", "doubleValue", "boolValue"):
+            if key in val:
+                return val[key]
+    return val
+
+
+def otlp_payload_to_trace_records(payload: dict[str, Any]) -> list[TraceRecord]:
+    """Parse standard OpenTelemetry (OTLP) ResourceSpans JSON payload into native TraceRecords.
+
+    Enables zero-code ingestion from external libraries (LangChain, vLLM, LiteLLM, OpenLLMetry).
+    """
+    resource_spans = payload.get("resourceSpans")
+    if resource_spans is None and "spans" in payload:
+        # Support flat span arrays for convenience
+        resource_spans = [{"scopeSpans": [{"spans": payload["spans"]}]}]
+    elif not resource_spans:
+        return []
+
+    spans_by_trace: dict[str, list[TraceSpan]] = {}
+
+    for rs in resource_spans:
+        res_attrs: dict[str, Any] = {}
+        for attr in rs.get("resource", {}).get("attributes", []):
+            if "key" in attr:
+                res_attrs[attr["key"]] = _extract_attr_value(attr.get("value"))
+
+        res_service_name = res_attrs.get("service.name", "ai-service")
+        res_trace_id = res_attrs.get("airun.trace_id")
+
+        for ss in rs.get("scopeSpans", []):
+            for s in ss.get("spans", []):
+                t_id = s.get("traceId") or res_trace_id or uuid.uuid4().hex
+                span_id = s.get("spanId") or uuid.uuid4().hex[:16]
+                parent_id = s.get("parentSpanId") or None
+                name = s.get("name") or "unnamed_span"
+
+                # Parse Unix nanoseconds
+                start_ns = int(s.get("startTimeUnixNano") or 0)
+                end_ns = int(s.get("endTimeUnixNano") or 0)
+                if start_ns > 0 and end_ns >= start_ns:
+                    duration_ms = (end_ns - start_ns) / 1_000_000.0
+                    start_iso = datetime.datetime.fromtimestamp(
+                        start_ns / 1e9, tz=datetime.timezone.utc
+                    ).isoformat()
+                    end_iso = datetime.datetime.fromtimestamp(
+                        end_ns / 1e9, tz=datetime.timezone.utc
+                    ).isoformat()
+                else:
+                    duration_ms = 0.0
+                    start_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    end_iso = start_iso
+
+                # Extract attributes
+                span_attrs: dict[str, Any] = {}
+                for attr in s.get("attributes", []):
+                    if "key" in attr:
+                        span_attrs[attr["key"]] = _extract_attr_value(attr.get("value"))
+
+                model = (
+                    span_attrs.get("model")
+                    or span_attrs.get("gen_ai.request.model")
+                    or span_attrs.get("llm.model_name")
+                )
+                provider = (
+                    span_attrs.get("provider")
+                    or span_attrs.get("gen_ai.system")
+                    or "openai"
+                )
+                tok_in = int(
+                    span_attrs.get("tokens.input")
+                    or span_attrs.get("gen_ai.usage.prompt_tokens")
+                    or span_attrs.get("gen_ai.usage.input_tokens")
+                    or 0
+                )
+                tok_out = int(
+                    span_attrs.get("tokens.output")
+                    or span_attrs.get("gen_ai.usage.completion_tokens")
+                    or span_attrs.get("gen_ai.usage.output_tokens")
+                    or 0
+                )
+                cost_usd = float(span_attrs.get("cost.usd") or span_attrs.get("cost") or 0.0)
+
+                # If cost was not supplied by exporter, calculate via pricing registry
+                if cost_usd == 0.0 and model and (tok_in > 0 or tok_out > 0):
+                    cost_usd = calculate_cost(model, tok_in, tok_out) or 0.0
+
+                raw_kind = str(span_attrs.get("span.kind", "internal")).lower()
+                if "llm" in raw_kind or "model" in name.lower() or model:
+                    kind = SpanKind.LLM
+                elif "tool" in raw_kind or "tool" in name.lower():
+                    kind = SpanKind.TOOL
+                elif "db" in raw_kind or "query" in name.lower():
+                    kind = SpanKind.DB
+                elif "workflow" in raw_kind or not parent_id:
+                    kind = SpanKind.WORKFLOW
+                else:
+                    kind = SpanKind.AGENT_STEP
+
+                status_code = s.get("status", {}).get("code", 1)
+                status = SpanStatus.FAILURE if status_code == 2 else SpanStatus.SUCCESS
+
+                trace_span = TraceSpan(
+                    trace_id=t_id,
+                    span_id=span_id,
+                    parent_id=parent_id,
+                    name=name,
+                    kind=kind,
+                    status=status,
+                    start_time=start_iso,
+                    end_time=end_iso,
+                    duration_ms=round(duration_ms, 2),
+                    tokens_input=tok_in,
+                    tokens_output=tok_out,
+                    model=model,
+                    provider=provider,
+                    cost_usd=round(cost_usd, 6),
+                    attributes=span_attrs,
+                )
+
+                if t_id not in spans_by_trace:
+                    spans_by_trace[t_id] = []
+                spans_by_trace[t_id].append(trace_span)
+
+    records: list[TraceRecord] = []
+    for t_id, spans in spans_by_trace.items():
+        total_duration = max((s.duration_ms or 0.0) for s in spans) if spans else 0.0
+        total_tokens = sum((s.tokens_input or 0) + (s.tokens_output or 0) for s in spans)
+        total_cost = sum(s.cost_usd or 0.0 for s in spans)
+        has_error = any(s.status == SpanStatus.FAILURE for s in spans)
+        workflow_name = spans[0].name if spans else res_service_name
+
+        summary = TraceSummary(
+            trace_id=t_id,
+            name=workflow_name,
+            start_time=spans[0].start_time if spans else datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            end_time=spans[-1].end_time if spans else None,
+            total_duration_ms=round(total_duration, 2),
+            total_tokens=total_tokens,
+            total_cost_usd=round(total_cost, 6),
+            outcome=SpanStatus.FAILURE if has_error else SpanStatus.SUCCESS,
+            span_count=len(spans),
+        )
+
+        records.append(
+            TraceRecord(
+                trace_id=t_id,
+                created_at=summary.start_time,
+                spans=spans,
+                summary=summary,
+            )
+        )
+
+    return records
+

@@ -1,8 +1,70 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: airun-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airun
+      POSTGRES_PASSWORD: airun_secret
+      POSTGRES_DB: airun_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airun -d airun_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  control-plane:
+    build:
+      context: ./packages/control-plane
+      dockerfile: Dockerfile
+    container_name: airun-control-plane
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://airun:airun_secret@postgres:5432/airun_db
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+
+  collector:
+    build:
+      context: ./crates/airun-collector
+      dockerfile: Dockerfile
+    container_name: airun-collector
+    restart: unless-stopped
+    depends_on:
+      - control-plane
+    environment:
+      PUBSUB_WEBHOOK_URL: http://control-plane:4000/api/v1/events
+      POLL_INTERVAL_MS: 1000
+      NODE_ID: docker-node-01
+      PROJECT_ID: local-airun
+
   airun:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airun-ui
+    restart: unless-stopped
+    depends_on:
+      - control-plane
     volumes:
       - ./traces:/app/.airun
-    command: airun demo
+    environment:
+      AIRUN_CONTROL_PLANE_URL: http://control-plane:4000
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "8080:8080"
+    command: airun ui --host 0.0.0.0 --port 8080
+
+volumes:
+  postgres_data:

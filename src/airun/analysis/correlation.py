@@ -7,10 +7,17 @@ Bridges Logical Tracing (Python SDK spans, tokens, agent steps) to Physical Sili
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 from airun.events.models import TraceRecord, TraceSpan
 from airun.pricing.energy import get_accelerator_profile
+
+
+class TelemetrySource(str, Enum):
+    MEASURED_HARDWARE = "measured_hardware"
+    ARCHITECTURAL_ESTIMATE = "architectural_estimate"
+    UNAVAILABLE = "unavailable"
 
 
 @dataclass
@@ -28,6 +35,19 @@ class PhysicalTelemetrySample:
     pcie_rx_mbs: float = 800.0
     nccl_wait_ms: float = 5.0
     cpu_util_pct: float = 30.0
+
+
+@dataclass
+class FabricTelemetrySample:
+    """In-kernel eBPF network fabric telemetry sample."""
+
+    timestamp: float
+    interface: str = "ib0"
+    packet_drops: int = 0
+    pfc_pause_rx: int = 0
+    pfc_pause_tx: int = 0
+    nccl_buffer_queue_depth_bytes: int = 8388608
+    rdma_retransmits: int = 0
 
 
 @dataclass
@@ -51,6 +71,10 @@ class HardwareWasteDiagnosis:
     avg_power_watts: float
     expected_impact: dict[str, str] = field(default_factory=dict)
     culprit_spans: list[dict[str, Any]] = field(default_factory=list)
+    telemetry_source: str = TelemetrySource.ARCHITECTURAL_ESTIMATE.value
+    is_estimated: bool = True
+    fabric_congestion_detected: bool = False
+    fabric_drops_total: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +95,10 @@ class HardwareWasteDiagnosis:
             "avg_power_watts": self.avg_power_watts,
             "expected_impact": self.expected_impact,
             "culprit_spans": self.culprit_spans,
+            "telemetry_source": self.telemetry_source,
+            "is_estimated": self.is_estimated,
+            "fabric_congestion_detected": self.fabric_congestion_detected,
+            "fabric_drops_total": self.fabric_drops_total,
         }
 
 
@@ -116,11 +144,15 @@ class TimeWindowCorrelator:
         self,
         trace: TraceRecord,
         telemetry: list[PhysicalTelemetrySample] | None = None,
+        fabric_telemetry: list[FabricTelemetrySample] | None = None,
         force_category: str | None = None,
     ) -> HardwareWasteDiagnosis:
         """Diagnose an entire trace and correlate against physical hardware bleed."""
         hourly_rate = self.profile.typical_hourly_cost_usd
         total_hourly_rate = hourly_rate * self.num_gpus
+        total_fabric_drops = sum(f.packet_drops for f in fabric_telemetry) if fabric_telemetry else 0
+        total_pfc_rx = sum(f.pfc_pause_rx for f in fabric_telemetry) if fabric_telemetry else 0
+        fabric_congested = (total_pfc_rx > 10 or total_fabric_drops > 5)
 
         # Find spans with large duration or high cost
         spans_summary = []
@@ -140,73 +172,164 @@ class TimeWindowCorrelator:
         spans_summary.sort(key=lambda x: x["duration_ms"], reverse=True)
         culprits = spans_summary[:3]
 
-        category = force_category
-        if not category:
-            span_names = [s.name.lower() for s in trace.spans]
-            if any("data" in n or "load" in n or "fetch" in n for n in span_names):
-                category = "dataloader_starvation"
-            elif any("nccl" in n or "sync" in n or "allreduce" in n for n in span_names):
-                category = "nccl_overhead"
-            elif any("embed" in n or "retriev" in n or "copy" in n for n in span_names):
-                category = "pcie_bottleneck"
+        is_estimated = True
+        telemetry_source = TelemetrySource.ARCHITECTURAL_ESTIMATE.value
+
+        if telemetry and len(telemetry) > 0:
+            is_estimated = False
+            telemetry_source = TelemetrySource.MEASURED_HARDWARE.value
+            avg_sm = sum(s.sm_util_pct for s in telemetry) / len(telemetry)
+            avg_power = sum(s.power_watts for s in telemetry) / len(telemetry)
+            max_pcie = max(s.pcie_tx_mbs for s in telemetry)
+            max_nccl = max(s.nccl_wait_ms for s in telemetry)
+            avg_cpu = sum(s.cpu_util_pct for s in telemetry) / len(telemetry)
+
+            category = force_category
+            if not category:
+                if avg_sm < 55.0 and max_pcie < 600.0:
+                    category = "dataloader_starvation"
+                elif max_nccl > 30.0:
+                    category = "nccl_overhead"
+                elif max_pcie > 7000.0:
+                    category = "pcie_bottleneck"
+                elif avg_cpu > 75.0 and avg_sm < 60.0:
+                    category = "framework_overhead"
+                elif avg_sm < 65.0:
+                    category = "dataloader_starvation"
+                else:
+                    category = "healthy_optimal"
+
+            if category == "dataloader_starvation":
+                primary = "Dataloader Starvation (CPU/IO Bound)"
+                symptom = f"GPU SM active cycles dropped to {avg_sm:.1f}% (idle stalls) while PCIe TX was idle ({max_pcie:.0f} MB/s)"
+                root_cause = "Host CPU data loading workers starved accelerator between training mini-batches"
+                action = "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
+                waste_pct = round(max(0.10, (55.0 - avg_sm) / 100.0), 2)
+                expected_impact = {
+                    "throughput_gain": "+31%",
+                    "waste_reduction": "-82%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.8, 2)}",
+                }
+            elif category == "nccl_overhead":
+                if fabric_congested:
+                    primary = "NCCL Synchronization Overhead (InfiniBand/RoCE Fabric Stall)"
+                    symptom = f"GPU threads stalled in All-Reduce barrier (>{max_nccl:.1f}ms wait); eBPF detected {total_fabric_drops} packet drops and {total_pfc_rx} PFC pause frames"
+                    root_cause = f"In-kernel eBPF confirmed network fabric buffer overflow and PFC pause storm on {fabric_telemetry[0].interface if fabric_telemetry else 'ib0'}"
+                    action = "Inspect InfiniBand switch PFC thresholds, tune NCCL_BUFFSIZE=16MB, and check RoCE ECN watermarks"
+                else:
+                    primary = "NCCL Synchronization Overhead (Network Bound)"
+                    symptom = f"GPU threads stalled in All-Reduce barrier (>{max_nccl:.1f}ms wait per step)"
+                    root_cause = "Inter-node RoCE/InfiniBand network fabric bandwidth bottleneck or packet drops"
+                    action = "Tune NCCL_BUFFSIZE=16MB and enable gradient accumulation to amortize synchronization"
+                waste_pct = round(min(0.40, max(0.15, max_nccl * 0.005)), 2)
+                expected_impact = {
+                    "step_time": "-22%",
+                    "effective_mfu": "+14%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.7, 2)}",
+                }
+            elif category == "pcie_bottleneck":
+                primary = "PCIe Bus Saturation (Memory Bound)"
+                symptom = f"Host-to-Device memory copy saturated PCIe bus (>{max_pcie:.0f} MB/s) while kernels stalled"
+                root_cause = "Synchronous host tensor allocations and unpinned memory copies during vector lookup"
+                action = "Pin embedding weights in GPU VRAM and use non_blocking=True asynchronous tensor transfers"
+                waste_pct = 0.25
+                expected_impact = {
+                    "latency": "-28%",
+                    "vram_efficiency": "+18%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.65, 2)}",
+                }
+            elif category == "framework_overhead":
+                primary = "Framework Eager Overhead (Software Bound)"
+                symptom = f"High host Python CPU overhead ({avg_cpu:.1f}%) creating idle kernel dispatch bubbles"
+                root_cause = "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
+                action = "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
+                waste_pct = 0.20
+                expected_impact = {
+                    "kernel_efficiency": "+35%",
+                    "step_latency": "-19%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.75, 2)}",
+                }
             else:
-                category = "dataloader_starvation"
-
-        if category == "dataloader_starvation":
-            primary = "Dataloader Starvation (CPU/IO Bound)"
-            symptom = "GPU SM active cycles dropped to 38.2% (idle stalls) while PCIe TX was idle (<400 MB/s)"
-            root_cause = "Host CPU data loading workers starved accelerator between training mini-batches"
-            action = "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
-            waste_pct = 0.34
-            expected_impact = {
-                "throughput_gain": "+31%",
-                "waste_reduction": "-82%",
-                "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.8, 2)}",
-            }
-            avg_sm = 38.2
-            avg_power = self.profile.tdp_watts * 0.55
-
-        elif category == "nccl_overhead":
-            primary = "NCCL Synchronization Overhead (Network Bound)"
-            symptom = "GPU threads stalled in All-Reduce barrier (>35ms wait per step)"
-            root_cause = "Inter-node RoCE/InfiniBand network fabric bandwidth bottleneck or packet drops"
-            action = "Tune NCCL_BUFFSIZE=16MB and enable gradient accumulation to amortize synchronization"
-            waste_pct = 0.28
-            expected_impact = {
-                "step_time": "-22%",
-                "effective_mfu": "+14%",
-                "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.7, 2)}",
-            }
-            avg_sm = 52.0
-            avg_power = self.profile.tdp_watts * 0.68
-
-        elif category == "pcie_bottleneck":
-            primary = "PCIe Bus Saturation (Memory Bound)"
-            symptom = "Host-to-Device memory copy saturated PCIe bus (>12,000 MB/s) while kernels stalled"
-            root_cause = "Synchronous host tensor allocations and unpinned memory copies during vector lookup"
-            action = "Pin embedding weights in GPU VRAM and use non_blocking=True asynchronous tensor transfers"
-            waste_pct = 0.25
-            expected_impact = {
-                "latency": "-28%",
-                "vram_efficiency": "+18%",
-                "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.65, 2)}",
-            }
-            avg_sm = 45.0
-            avg_power = self.profile.tdp_watts * 0.62
-
+                primary = "Optimal Silicon Utilization (Healthy)"
+                symptom = f"GPU SM active cycles healthy ({avg_sm:.1f}%), PCIe TX/RX within normal operating limits ({max_pcie:.0f} MB/s)"
+                root_cause = "No hardware or network stalls detected across measured telemetry window"
+                action = "Maintain current batching, memory pinning, and network fabric configuration"
+                waste_pct = 0.0
+                expected_impact = {
+                    "efficiency": "Optimal",
+                    "waste_reduction": "0%",
+                    "weekly_cost_savings": "$0.00",
+                }
         else:
-            primary = "Framework Eager Overhead (Software Bound)"
-            symptom = "High host Python CPU overhead (>80%) creating idle kernel dispatch bubbles"
-            root_cause = "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
-            action = "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
-            waste_pct = 0.20
-            expected_impact = {
-                "kernel_efficiency": "+35%",
-                "step_latency": "-19%",
-                "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.75, 2)}",
-            }
-            avg_sm = 55.0
-            avg_power = self.profile.tdp_watts * 0.70
+            is_estimated = True
+            telemetry_source = TelemetrySource.ARCHITECTURAL_ESTIMATE.value
+            category = force_category
+            if not category:
+                span_names = [s.name.lower() for s in trace.spans]
+                if any("data" in n or "load" in n or "fetch" in n for n in span_names):
+                    category = "dataloader_starvation"
+                elif any("nccl" in n or "sync" in n or "allreduce" in n for n in span_names):
+                    category = "nccl_overhead"
+                elif any("embed" in n or "retriev" in n or "copy" in n for n in span_names):
+                    category = "pcie_bottleneck"
+                else:
+                    category = "dataloader_starvation"
+
+            if category == "dataloader_starvation":
+                primary = "Dataloader Starvation (CPU/IO Bound)"
+                symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] GPU SM active cycles estimated at ~38.2% (idle stalls) while PCIe TX was idle (<400 MB/s)"
+                root_cause = "Host CPU data loading workers starved accelerator between training mini-batches"
+                action = "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
+                waste_pct = 0.34
+                expected_impact = {
+                    "throughput_gain": "+31%",
+                    "waste_reduction": "-82%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.8, 2)}",
+                }
+                avg_sm = 38.2
+                avg_power = self.profile.tdp_watts * 0.55
+
+            elif category == "nccl_overhead":
+                primary = "NCCL Synchronization Overhead (Network Bound)"
+                symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] GPU threads stalled in All-Reduce barrier (>35ms wait per step)"
+                root_cause = "Inter-node RoCE/InfiniBand network fabric bandwidth bottleneck or packet drops"
+                action = "Tune NCCL_BUFFSIZE=16MB and enable gradient accumulation to amortize synchronization"
+                waste_pct = 0.28
+                expected_impact = {
+                    "step_time": "-22%",
+                    "effective_mfu": "+14%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.7, 2)}",
+                }
+                avg_sm = 52.0
+                avg_power = self.profile.tdp_watts * 0.68
+
+            elif category == "pcie_bottleneck":
+                primary = "PCIe Bus Saturation (Memory Bound)"
+                symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] Host-to-Device memory copy saturated PCIe bus (>12,000 MB/s) while kernels stalled"
+                root_cause = "Synchronous host tensor allocations and unpinned memory copies during vector lookup"
+                action = "Pin embedding weights in GPU VRAM and use non_blocking=True asynchronous tensor transfers"
+                waste_pct = 0.25
+                expected_impact = {
+                    "latency": "-28%",
+                    "vram_efficiency": "+18%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.65, 2)}",
+                }
+                avg_sm = 45.0
+                avg_power = self.profile.tdp_watts * 0.62
+
+            else:
+                primary = "Framework Eager Overhead (Software Bound)"
+                symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] High host Python CPU overhead (>80%) creating idle kernel dispatch bubbles"
+                root_cause = "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
+                action = "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
+                waste_pct = 0.20
+                expected_impact = {
+                    "kernel_efficiency": "+35%",
+                    "step_latency": "-19%",
+                    "weekly_cost_savings": f"${round(waste_pct * total_hourly_rate * 168 * 0.75, 2)}",
+                }
+                avg_sm = 55.0
+                avg_power = self.profile.tdp_watts * 0.70
 
         hourly_bleed = round(waste_pct * total_hourly_rate, 2)
         weekly_bleed = round(hourly_bleed * 168, 2)
@@ -232,8 +355,12 @@ class TimeWindowCorrelator:
             hourly_bleed_usd=hourly_bleed,
             weekly_bleed_usd=weekly_bleed,
             monthly_bleed_usd=monthly_bleed,
-            avg_sm_util_pct=avg_sm,
-            avg_power_watts=avg_power,
+            avg_sm_util_pct=round(avg_sm, 1),
+            avg_power_watts=round(avg_power, 1),
             expected_impact=expected_impact,
             culprit_spans=culprits,
+            telemetry_source=telemetry_source,
+            is_estimated=is_estimated,
+            fabric_congestion_detected=fabric_congested,
+            fabric_drops_total=total_fabric_drops,
         )

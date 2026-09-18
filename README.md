@@ -8,7 +8,7 @@
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/dm/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="Downloads"></a>
   <a href="https://github.com/sarkarbikram90/airun-profiler"><img src="https://img.shields.io/github/stars/sarkarbikram90/airun-profiler?style=social" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/tests-93%20passed-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-127%20passed-brightgreen.svg" alt="Tests">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Ruff"></a>
 </p>
 
@@ -222,6 +222,7 @@ airun compare previous latest
 | `airun profiler trace --pid <pid>` | Open-source profiler hook with hardware counter sampling & Airun Cloud ROI assessment |
 | `airun metrics [latest\|<id>]` | Display Executive Economics: Intelligence per Dollar (IPD), Intelligence per Watt (IPW), Energy |
 | `airun frontier` | View Pareto Efficient Frontier across Model Quality, Latency, and Cost |
+| `airun policy [list\|evaluate]` | Manage and evaluate automated closed-loop remediation policies |
 | `airun dr drill` | Run automated Disaster Recovery drill with provider failover audit scorecard |
 | `airun breaker status` | Inspect live AI Breaker Box provider circuit breaker health |
 | `airun doctor` | Verify local workspace, database health, and micro-overhead |
@@ -346,9 +347,12 @@ Output:
 ---
 
 ### The 3 Evolutionary Phases
-- **Phase 1 — Developer Platform (Current Foundation)**: Local-first Python SDK & CLI (`@trace`, `airun report`, `airun compare`, `airun waste`, `airun frontier`) with microsecond overhead and zero network dependencies.
+- **Phase 1 — Developer Platform**: Local-first Python SDK & CLI (`@trace`, `airun report`, `airun compare`, `airun waste`, `airun frontier`) with microsecond overhead and zero network dependencies.
 - **Phase 2 — Cloud Control Plane & Silicon Bridge**: Multi-tenant SaaS architecture connecting logical traces to physical silicon via Rust Data Plane DaemonSet (`deploy/kubernetes/daemonset-agent.yaml`, `deploy/helm/airun-data-plane/`), Pub/Sub, PostgreSQL (`deploy/postgres/schema.sql`), and TypeScript control plane (`packages/control-plane`).
-- **Phase 3 — Infrastructure Intelligence**: Closed autonomic product loop:
+- **Phase 3 — Autonomous Multi-Cloud Platform (10.0 / 10.0)**:
+  - **In-Kernel eBPF Fabric Tracing**: Kernel tracepoints (`kfree_skb`, `net_dev_xmit`) detecting RoCE/InfiniBand packet drops and PFC pause frame storms.
+  - **Multi-Cluster Cross-Cloud Federation (`airun cluster [list|overview|recommend]`)**: Global GPU capacity aggregation and intelligent MFU-per-dollar placement across GCP GKE, AWS EKS, Azure AKS, and on-premise DGX SuperPODs.
+  - **Live Silicon CI Hardware Testing**: Dedicated physical GPU test suite (`tests/hardware/test_silicon_hardware.py`), Kubernetes GPU runner manifest (`deploy/ci/gpu-runner.yaml`), and GitHub Actions workflow (`.github/workflows/gpu-hardware-ci.yml`).
   $$\text{Observe} \longrightarrow \text{Understand} \longrightarrow \text{Measure Economics} \longrightarrow \text{Find Waste} \longrightarrow \text{Recommend Optimization} \longrightarrow \text{Remediate} \longrightarrow \text{Learn}$$
 
 ---

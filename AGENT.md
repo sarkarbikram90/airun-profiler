@@ -28,7 +28,7 @@ Observe → Explain → Optimize → Control → Automate
 
 ```text
 airun-profiler/
-├── src/airun/                      # Core Python Package (93 tests, 100% passing)
+├── src/airun/                      # Core Python Package (110 tests, 100% passing; 127 total across stacks)
 │   ├── __init__.py                 # Top-level exports: trace, SpanKind, calculate_energy, EvalRouter, etc.
 │   ├── __main__.py                 # CLI entrypoint for 'python -m airun'
 │   ├── config.py                   # Pydantic configuration loader (.airun/config.yaml)

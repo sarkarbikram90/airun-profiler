@@ -97,11 +97,45 @@ pub struct GpuAlertPayload {
 pub struct PubSubPublisher {
     pub topic: String,
     pub project_id: String,
+    pub endpoint_url: Option<String>,
+    client: reqwest::Client,
 }
 
 impl PubSubPublisher {
     pub fn new(topic: String, project_id: String) -> Self {
-        Self { topic, project_id }
+        let endpoint_url = std::env::var("PUBSUB_WEBHOOK_URL")
+            .or_else(|_| std::env::var("AIRUN_EVENT_ENDPOINT"))
+            .or_else(|_| std::env::var("PUBSUB_EMULATOR_HOST").map(|h| {
+                if h.starts_with("http://") || h.starts_with("https://") {
+                    format!("{}/v1/projects/{}/topics/{}:publish", h, project_id, topic)
+                } else {
+                    format!("http://{}/v1/projects/{}/topics/{}:publish", h, project_id, topic)
+                }
+            }))
+            .ok();
+
+        Self {
+            topic,
+            project_id,
+            endpoint_url,
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_millis(3000))
+                .build()
+                .unwrap_or_default(),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_endpoint(topic: String, project_id: String, endpoint_url: String) -> Self {
+        Self {
+            topic,
+            project_id,
+            endpoint_url: Some(endpoint_url),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_millis(3000))
+                .build()
+                .unwrap_or_default(),
+        }
     }
 
     /// Publishes a strongly-typed event envelope to Pub/Sub.
@@ -128,6 +162,31 @@ impl PubSubPublisher {
 
         let json = serde_json::to_string(&envelope)
             .map_err(|e| format!("Failed to serialize envelope: {}", e))?;
+
+        if let Some(endpoint) = &self.endpoint_url {
+            let res = self.client
+                .post(endpoint)
+                .header("Content-Type", "application/json")
+                .body(json.clone())
+                .send()
+                .await;
+
+            match res {
+                Ok(resp) => {
+                    println!(
+                        "[airun-collector] Pub/Sub Event Dispatched to {}: HTTP {}",
+                        endpoint,
+                        resp.status()
+                    );
+                }
+                Err(err) => {
+                    eprintln!(
+                        "[airun-collector] Network dispatch to '{}' failed (non-fatal): {}",
+                        endpoint, err
+                    );
+                }
+            }
+        }
 
         let msg_id = format!("msg_{}", chrono::Utc::now().timestamp_millis());
         println!(
@@ -157,6 +216,22 @@ impl PubSubPublisher {
 
         let json = serde_json::to_string(&envelope)
             .map_err(|e| format!("Failed to serialize batch envelope: {}", e))?;
+
+        if let Some(endpoint) = &self.endpoint_url {
+            let res = self.client
+                .post(endpoint)
+                .header("Content-Type", "application/json")
+                .body(json.clone())
+                .send()
+                .await;
+
+            if let Err(err) = res {
+                eprintln!(
+                    "[airun-collector] Batch network dispatch to '{}' failed (non-fatal): {}",
+                    endpoint, err
+                );
+            }
+        }
 
         let msg_id = format!("msg_{}", chrono::Utc::now().timestamp_millis());
         println!(
@@ -210,5 +285,85 @@ mod tests {
         assert_eq!(deserialized.event_type, AirunEventType::GpuAlert);
         assert_eq!(deserialized.payload.gpu_index, 0);
         assert_eq!(deserialized.payload.metric_value, 1.8);
+    }
+
+    #[tokio::test]
+    async fn test_publisher_local_dispatch() {
+        let publisher = PubSubPublisher::new("telemetry-topic".to_string(), "test-proj".to_string());
+        assert_eq!(publisher.topic, "telemetry-topic");
+        assert_eq!(publisher.project_id, "test-proj");
+
+        let payload = WorkloadLifecyclePayload {
+            workload_name: "test-workload".to_string(),
+            workload_type: "training".to_string(),
+            node_id: "node-0".to_string(),
+            pid: Some(1234),
+            duration_ms: Some(150.0),
+            status: "completed".to_string(),
+        };
+
+        let result = publisher
+            .publish_event(
+                AirunEventType::WorkloadCompleted,
+                "airun-collector/test",
+                Some("wl-123".to_string()),
+                Some("tr-456".to_string()),
+                payload,
+            )
+            .await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().starts_with("msg_"));
+    }
+
+    #[tokio::test]
+    async fn test_publisher_network_dispatch_mock() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let endpoint = format!("http://127.0.0.1:{}/publish", port);
+
+        let server_handle = tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                let mut buf = [0u8; 2048];
+                let n = socket.read(&mut buf).await.unwrap();
+                let request = String::from_utf8_lossy(&buf[..n]);
+
+                assert!(request.starts_with("POST /publish HTTP/1.1"));
+                assert!(request.contains("workload.started"));
+
+                let response = "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\n{\"status\":\"ok\"}";
+                socket.write_all(response.as_bytes()).await.unwrap();
+            }
+        });
+
+        let publisher = PubSubPublisher::with_endpoint(
+            "telemetry-topic".to_string(),
+            "test-proj".to_string(),
+            endpoint,
+        );
+
+        let payload = WorkloadLifecyclePayload {
+            workload_name: "net-test-workload".to_string(),
+            workload_type: "training".to_string(),
+            node_id: "node-1".to_string(),
+            pid: Some(5678),
+            duration_ms: None,
+            status: "started".to_string(),
+        };
+
+        let res = publisher
+            .publish_event(
+                AirunEventType::WorkloadStarted,
+                "airun-collector/net-test",
+                Some("wl-net".to_string()),
+                None,
+                payload,
+            )
+            .await;
+
+        assert!(res.is_ok());
+        server_handle.await.unwrap();
     }
 }

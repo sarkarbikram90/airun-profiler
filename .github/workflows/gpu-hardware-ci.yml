@@ -1,0 +1,70 @@
+﻿name: Live Silicon Hardware CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  silicon-hardware-verification:
+    name: Physical Silicon Test (NVIDIA H100 Runner)
+    runs-on: [ self-hosted, linux, x64, gpu-h100 ]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Inspect Physical Silicon GPU & Drivers
+        run: |
+          echo "=== Physical GPU Device Inspection ==="
+          nvidia-smi
+          nvidia-smi --query-gpu=name,driver_version,memory.total,power.limit,compute_cap --format=csv
+          echo "=== NVLink Status ==="
+          nvidia-smi nvlink -s || true
+          echo "=== DCGM & In-Kernel Tracepoint Inspection ==="
+          ls -la /var/run/nvidia-dcgm/dcgm.sock || echo "DCGM socket not present, using eBPF / sysfs fallback"
+          ls -la /sys/kernel/debug/tracing/events/net || echo "Net tracepoints mounted"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install Python Package & Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,otel]"
+
+      - name: Run Rust Collector eBPF & DCGM Unit Tests
+        run: |
+          cargo test --manifest-path crates/airun-collector/Cargo.toml --all-features
+          cargo clippy --manifest-path crates/airun-collector/Cargo.toml -- -D warnings
+
+      - name: Execute Live Silicon Hardware Test Suite
+        run: |
+          pytest tests/hardware/test_silicon_hardware.py -v -s --junitxml=silicon-test-results.xml
+
+      - name: End-to-End Silicon Profiler & Waste CLI Test
+        run: |
+          airun demo
+          airun waste latest --hardware --accelerator h100 --gpus 8
+          airun cluster list
+          airun cluster overview
+          airun cluster recommend live-silicon-benchmark --gpus 8 --accelerator h100
+
+      - name: Upload Hardware Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: silicon-hardware-ci-results
+          path: |
+            silicon-test-results.xml

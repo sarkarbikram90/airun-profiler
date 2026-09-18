@@ -139,6 +139,17 @@ class DistributedPipelineEngine:
         compliant with deploy/postgres/schema.sql (runs, cost_records, recommendations).
         """
         summary = trace_record.summary
+        total_cost = summary.total_cost_usd if summary else 0.0
+        wasted_cost = summary.wasted_cost_usd if summary else 0.0
+        mfu = summary.mfu_pct if (summary and summary.mfu_pct is not None) else 48.5
+        tflops = summary.achieved_tflops if (summary and summary.achieved_tflops is not None) else 480.0
+        hourly_bleed = (
+            summary.hourly_bleed_usd
+            if (summary and summary.hourly_bleed_usd is not None)
+            else (round(optimization_payload.potential_monthly_savings_usd / 720.0, 2) if optimization_payload else 16.95)
+        )
+        category = optimization_payload.category if optimization_payload else "dataloader_starvation"
+
         run_record = {
             "table": "runs",
             "workload_id": f"wl_{workload_name}",
@@ -149,20 +160,20 @@ class DistributedPipelineEngine:
             "duration_ms": summary.total_duration_ms if summary else 0.0,
             "critical_path_ms": summary.critical_path_ms if summary else 0.0,
             "total_tokens": summary.total_tokens if summary else 0,
-            "total_cost_usd": summary.total_cost_usd if summary else 0.0,
-            "wasted_cost_usd": summary.wasted_cost_usd if summary else 0.0,
-            "mfu_pct": 48.5,
-            "achieved_tflops": 480.0,
+            "total_cost_usd": total_cost,
+            "wasted_cost_usd": wasted_cost,
+            "mfu_pct": mfu,
+            "achieved_tflops": tflops,
         }
 
         cost_record = {
             "table": "cost_records",
             "accelerator": "H100-SXM5-80GB",
             "num_devices": 8,
-            "compute_cost_usd": trace_record.summary.total_cost_usd,
-            "financial_bleed_hourly_usd": 16.95,
-            "wasted_cost_usd": trace_record.summary.wasted_cost_usd,
-            "primary_waste_category": "dataloader_starvation",
+            "compute_cost_usd": total_cost,
+            "financial_bleed_hourly_usd": hourly_bleed,
+            "wasted_cost_usd": wasted_cost,
+            "primary_waste_category": category,
         }
 
         rec_record = None

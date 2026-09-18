@@ -115,3 +115,25 @@ def test_run_disaster_recovery_drill():
     assert report.tool_conversion_success is True
     assert report.quality_retention_pct >= 90.0
     assert len(report.actionable_recommendations) > 0
+    assert report.drill_mode == "simulated_catalog"
+
+
+def test_run_disaster_recovery_drill_live():
+    """Verify live executor drill mode."""
+    called = []
+
+    def mock_executor(provider, model, msgs, tool):
+        called.append((provider, model))
+        return {"status": "success"}
+
+    report = run_disaster_recovery_drill(
+        primary_provider="openai",
+        fallback_provider="anthropic",
+        fault_type="latency_spike",
+        execute_live=True,
+        live_executor=mock_executor,
+    )
+
+    assert report.drill_mode == "live_executed"
+    assert len(called) == 1
+    assert called[0][0] == "anthropic"

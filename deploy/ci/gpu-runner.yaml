@@ -1,0 +1,112 @@
+﻿apiVersion: v1
+kind: Namespace
+metadata:
+  name: airun-ci
+  labels:
+    app.kubernetes.io/part-of: airun-profiler
+    environment: continuous-integration
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airun-gpu-ci-runner
+  namespace: airun-ci
+  labels:
+    app: airun-gpu-ci-runner
+    role: self-hosted-runner
+    accelerator: h100
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airun-gpu-ci-runner
+  template:
+    metadata:
+      labels:
+        app: airun-gpu-ci-runner
+        accelerator: h100
+        tier: live-silicon-ci
+    spec:
+      hostPID: true
+      hostNetwork: true
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: actions-gpu-runner
+          image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update && apt-get install -y --no-install-recommends \
+                curl git jq sudo build-essential libssl-dev pkg-config python3 python3-pip python3-venv clang llvm
+              # Install Rust toolchain
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+              source \C:\Users\bikrams/.cargo/env
+              # Register and start runner
+              /actions-runner/run.sh
+          env:
+            - name: RUNNER_NAME
+              value: "airun-silicon-h100-node-01"
+            - name: RUNNER_LABELS
+              value: "self-hosted,linux,x64,gpu-h100,live-silicon"
+            - name: RUNNER_REPOSITORY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: repo-url
+            - name: RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: runner-token
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - SYS_PTRACE
+                - BPF
+                - NET_ADMIN
+                - SYS_ADMIN
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+              cpu: "16"
+              memory: 64Gi
+            requests:
+              nvidia.com/gpu: 1
+              cpu: "8"
+              memory: 32Gi
+          volumeMounts:
+            - name: dcgm-socket
+              mountPath: /var/run/nvidia-dcgm
+            - name: infiniband-dev
+              mountPath: /dev/infiniband
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+              readOnly: true
+            - name: runner-workspace
+              mountPath: /actions-runner/_work
+      volumes:
+        - name: dcgm-socket
+          hostPath:
+            path: /var/run/nvidia-dcgm
+            type: DirectoryOrCreate
+        - name: infiniband-dev
+          hostPath:
+            path: /dev/infiniband
+            type: DirectoryOrCreate
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+            type: DirectoryOrCreate
+        - name: runner-workspace
+          emptyDir: {}

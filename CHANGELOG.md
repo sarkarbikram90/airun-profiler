@@ -2,6 +2,50 @@
 
 All notable changes to `airun` are documented in this file.
 
+## [0.1.6] - 2026-09-18
+
+### Added
+- **In-Kernel eBPF Fabric Tracing**:
+  - Rust DaemonSet (`crates/airun-collector/src/ebpf.rs`): Kernel-level InfiniBand/RoCE packet drops (`kfree_skb`), PFC pause frame counters, and NCCL buffer queue inspection with Linux tracepoints, sysfs, and mock fallback.
+  - Rust Collector OpenMetrics metrics: `airun_fabric_packet_drops_total`, `airun_fabric_pfc_pause_frames_total`, `airun_nccl_buffer_queue_depth_bytes`.
+  - Python Analytics (`src/airun/analysis/correlation.py`): Sub-millisecond correlation of eBPF network fabric congestion events directly with distributed NCCL synchronization stalls and financial waste.
+- **Multi-Cluster Cross-Cloud Federation**:
+  - TypeScript Control Plane (`packages/control-plane/src/db.ts` & `src/index.ts`): Federated cluster registry and placement engine across GCP GKE, AWS EKS, Azure AKS, and on-premise DGX SuperPODs.
+  - Endpoints: `GET /api/v1/federation/clusters`, `GET /api/v1/federation/overview`, `POST /api/v1/federation/clusters`, `POST /api/v1/federation/placement`.
+  - Python Typer CLI (`airun cluster`):
+    - `airun cluster list [--provider] [--accelerator]`: Renders rich multi-cloud cluster table.
+    - `airun cluster overview`: Displays global GPU footprint, aggregate spend, and total financial bleed.
+    - `airun cluster recommend <workload> [--gpus] [--accelerator] [--max-rate]`: Multi-cloud workload placement optimized for MFU-per-dollar efficiency.
+- **Live Silicon CI Hardware Testing**:
+  - Physical GPU Hardware Test Suite (`tests/hardware/test_silicon_hardware.py`): Queries device name, driver version, memory, SM utilization, thermal temperatures, and power draw using `nvidia-smi` and `pynvml`, with graceful degradation in virtualized/CPU-only CI environments.
+  - Self-Hosted GPU Runner Manifest (`deploy/ci/gpu-runner.yaml`): Kubernetes deployment for running GitHub Actions self-hosted runners on NVIDIA H100/A100 nodes with DCGM, InfiniBand, and tracepoint volume mounts.
+  - Dedicated Hardware CI Workflow (`.github/workflows/gpu-hardware-ci.yml`): Continuous testing against live silicon hardware runners.
+- **1-Click Web UI Example Data Seeding (`POST /api/demo`)**:
+  - Added a prominent **"⚡ Load Example Data"** button directly to the Web UI (`airun ui`) navigation bar and empty states.
+  - In-browser seeding endpoint (`POST /api/demo` & `GET /api/demo`): Instantly generates 4 realistic AI workloads (Multi-Agent Research Pipeline with Claude 3.5 Sonnet & GPT-4o, Customer Support RAG with Cohere reranking, Distributed 8x H100 Pretraining with hardware energy metrics, and Resilience Drill with transient retry recovery).
+
+
+## [0.1.5] - 2026-09-18
+
+### Added
+- **Native Prometheus & OpenMetrics Exporters (`/metrics`)**:
+  - Rust DaemonSet (`crates/airun-collector`): Dedicated HTTP server on port `9445` exporting live DCGM GPU silicon metrics (`airun_gpu_sm_utilization_pct`, `airun_gpu_memory_used_bytes`, `airun_gpu_power_watts`, `airun_gpu_temperature_celsius`, `airun_collector_samples_total`).
+  - Python Runtime (`src/airun/server`): Standard Prometheus gauge and counter exporter at `GET /metrics` (`airun_traces_total`, `airun_cost_usd_total`, `airun_tokens_total`, `airun_wasted_cost_usd_total`, `airun_circuit_breaker_state`).
+- **Standard OTLP Trace Ingestion Receiver (`POST /v1/traces`)**:
+  - Full ingestion compatibility with LangChain, vLLM, LiteLLM, and OpenLLMetry.
+  - Python: `otlp_payload_to_trace_records()` in `src/airun/exporters/otlp.py` mapping `resourceSpans`, model parameters, token usage, and span hierarchies. Exposed at `POST /v1/traces` and `POST /api/traces`.
+  - TypeScript: Ingestion receiver at `POST /v1/traces` in `packages/control-plane/src/index.ts` streaming external spans directly into PostgreSQL / in-memory state.
+- **Real-Time Live Streaming (WebSockets & SSE)**:
+  - TypeScript Control Plane: Real-time WebSocket server at `/ws/live` broadcasting all distributed pub/sub events (`AirunEventEnvelope`) to connected dashboards.
+  - Python Web Server: Live Server-Sent Events stream at `GET /api/live/stream`.
+- **Automated Closed-Loop Remediation Policy Engine**:
+  - `src/airun/resilience/remediation_engine.py`: Autonomously evaluates live trace findings and hardware telemetry against declarative policies.
+  - Interventions: Pareto-optimal model routing shifts (`ROUTING_SHIFT`), automated circuit breaker trips (`CIRCUIT_BREAKER_TRIP`), webhook alerts (`WEBHOOK_DISPATCH`), and structured audit logging (`LOG_AUDIT`).
+  - Rich CLI commands: `airun policy list` and `airun policy evaluate [trace_id]`.
+- **High-Throughput Concurrency & Load Benchmark Suite**:
+  - Python: `tests/benchmarks/test_load_concurrency.py` benchmarking 50 concurrent threads executing 1,050 spans (verified p99 latency < 1.5ms and zero deadlocks) and 100 concurrent async coroutines.
+  - Rust: `test_ring_buffer_high_throughput` benchmarking 100,000 samples through the lock-free ring buffer exceeding 500,000 ops/sec.
+
 ## [0.1.4] - 2026-09-07
 
 ### Added

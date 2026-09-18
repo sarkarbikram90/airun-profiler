@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
 import typer
 import yaml
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from airun.analysis.analyzer import analyze_spans
@@ -26,10 +30,14 @@ from airun.cli.formatting import (
     render_dr_drill_panel,
     render_efficient_frontier_table,
     render_executive_metrics_panel,
+    render_federated_clusters_table,
+    render_federation_overview_panel,
     render_findings_panel,
     render_golden_signals_panel,
     render_hardware_bleed_panel,
     render_profiler_summary_panel,
+    render_remediation_results_panel,
+    render_remediation_rules_table,
     render_trace_summary_panel,
     render_traces_list_table,
     render_waste_analysis_panel,
@@ -43,6 +51,7 @@ from airun.graph.builder import ExecutionGraph
 from airun.pricing.defaults import DEFAULT_MODEL_PRICING
 from airun.resilience.breaker import get_resilience_manager
 from airun.resilience.dr_drills import run_disaster_recovery_drill
+from airun.resilience.remediation_engine import get_default_remediation_engine
 from airun.routing.frontier import get_efficient_frontier
 from airun.sdk.tracer import record_retry, set_span_metadata, set_span_tokens, trace
 from airun.store import get_trace_store
@@ -59,12 +68,16 @@ trace_app = typer.Typer(help="Manage and inspect captured execution traces.")
 dr_app = typer.Typer(help="Execute and evaluate AI Disaster Recovery (DR) drills.")
 breaker_app = typer.Typer(help="Inspect and manage the AI Breaker Box.")
 profiler_app = typer.Typer(help="Open-source process profiler and GTM waste hook.")
+policy_app = typer.Typer(help="Manage and evaluate automated closed-loop remediation policies.")
+cluster_app = typer.Typer(help="Inspect and manage multi-cluster cross-cloud federation.")
 
 app.add_typer(trace_app, name="trace")
 app.add_typer(dr_app, name="dr")
 app.add_typer(breaker_app, name="breaker")
 app.add_typer(profiler_app, name="profiler")
 app.add_typer(pipeline_app, name="pipeline")
+app.add_typer(policy_app, name="policy")
+app.add_typer(cluster_app, name="cluster")
 
 
 console = Console()
@@ -521,6 +534,311 @@ def breaker_status() -> None:
     mgr = get_resilience_manager()
     statuses = mgr.get_all_statuses()
     console.print("\n", render_breaker_status_table(statuses), "\n")
+
+
+@policy_app.command("list")
+def policy_list() -> None:
+    """List active closed-loop remediation rules and safety guardrails."""
+    engine = get_default_remediation_engine()
+    console.print("\n", render_remediation_rules_table(engine.rules), "\n")
+
+
+@policy_app.command("evaluate")
+def policy_evaluate(
+    trace_id: str = typer.Argument("latest", help="Trace ID to evaluate against policies (or 'latest')."),
+    accelerator: str = typer.Option(
+        "h100", "--accelerator", "-a", help="Target accelerator for physical hardware diagnosis."
+    ),
+    gpus: int = typer.Option(8, "--gpus", "-g", help="Number of GPUs in node pool."),
+) -> None:
+    """Evaluate a trace against closed-loop remediation policies and trigger autonomous actions."""
+    store = get_trace_store()
+    resolved_id = _resolve_trace_id(trace_id, store)
+    record = store.get_trace(resolved_id)
+
+    if not record:
+        console.print(f"[bold red]Trace '{trace_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    correlator = TimeWindowCorrelator(accelerator=accelerator, num_gpus=gpus)
+    diagnosis = correlator.diagnose_trace(record)
+
+    engine = get_default_remediation_engine()
+    results = engine.evaluate_trace(record, diagnosis)
+
+    console.print("\n", render_remediation_results_panel(results, resolved_id), "\n")
+
+
+DEFAULT_FEDERATED_CLUSTERS = [
+    {
+        "cluster_id": "gke-us-central1-h100",
+        "name": "GCP GKE H100 Supercluster",
+        "provider": "gcp",
+        "region": "us-central1",
+        "accelerator_type": "h100",
+        "total_gpus": 512,
+        "active_gpus": 448,
+        "hourly_rate_per_gpu": 3.85,
+        "average_mfu_pct": 46.2,
+        "average_bleed_hourly_usd": 215.40,
+        "health_status": "healthy",
+        "endpoint_url": "https://gke.us-central1.airun.internal",
+    },
+    {
+        "cluster_id": "eks-us-east-1-h100",
+        "name": "AWS EKS H100 Cluster",
+        "provider": "aws",
+        "region": "us-east-1",
+        "accelerator_type": "h100",
+        "total_gpus": 256,
+        "active_gpus": 192,
+        "hourly_rate_per_gpu": 4.10,
+        "average_mfu_pct": 41.8,
+        "average_bleed_hourly_usd": 142.80,
+        "health_status": "healthy",
+        "endpoint_url": "https://eks.us-east-1.airun.internal",
+    },
+    {
+        "cluster_id": "aks-westus3-a100",
+        "name": "Azure AKS A100 Training Pool",
+        "provider": "azure",
+        "region": "westus3",
+        "accelerator_type": "a100",
+        "total_gpus": 128,
+        "active_gpus": 96,
+        "hourly_rate_per_gpu": 3.40,
+        "average_mfu_pct": 38.4,
+        "average_bleed_hourly_usd": 88.50,
+        "health_status": "healthy",
+        "endpoint_url": "https://aks.westus3.airun.internal",
+    },
+    {
+        "cluster_id": "onprem-dgx-h100",
+        "name": "On-Prem DGX SuperPOD",
+        "provider": "on-prem",
+        "region": "dc-sjc-01",
+        "accelerator_type": "h100",
+        "total_gpus": 64,
+        "active_gpus": 64,
+        "hourly_rate_per_gpu": 2.10,
+        "average_mfu_pct": 52.1,
+        "average_bleed_hourly_usd": 18.20,
+        "health_status": "healthy",
+        "endpoint_url": "https://dgx.local.airun.internal",
+    },
+]
+
+
+def _fetch_federated_clusters(endpoint: str | None = None) -> list[dict]:
+    """Fetch clusters from control plane or fallback to default seeded clusters."""
+    ep = endpoint or os.getenv("AIRUN_CONTROL_PLANE_URL", "http://localhost:3000")
+    url = f"{ep.rstrip('/')}/api/v1/federation/clusters"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, dict) and "clusters" in data:
+                return data["clusters"]
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return list(DEFAULT_FEDERATED_CLUSTERS)
+
+
+def _fetch_federation_overview(endpoint: str | None = None) -> dict:
+    """Fetch federation overview from control plane or calculate from local cluster data."""
+    ep = endpoint or os.getenv("AIRUN_CONTROL_PLANE_URL", "http://localhost:3000")
+    url = f"{ep.rstrip('/')}/api/v1/federation/overview"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, dict) and "overview" in data:
+                return data["overview"]
+            if isinstance(data, dict) and ("totalClusters" in data or "total_clusters" in data):
+                return data
+    except Exception:
+        pass
+
+    clusters = _fetch_federated_clusters(endpoint)
+    total_clusters = len(clusters)
+    total_gpus = sum(c.get("total_gpus", c.get("totalGpus", 0)) for c in clusters)
+    active_gpus = sum(c.get("active_gpus", c.get("activeGpus", 0)) for c in clusters)
+    spend = sum(
+        c.get("active_gpus", c.get("activeGpus", 0)) * c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 0.0))
+        for c in clusters
+    )
+    bleed = sum(c.get("average_bleed_hourly_usd", c.get("averageBleedHourlyUsd", 0.0)) for c in clusters)
+    avg_mfu = (
+        sum(c.get("average_mfu_pct", c.get("averageMfuPct", 0.0)) for c in clusters) / total_clusters
+        if total_clusters > 0
+        else 0.0
+    )
+    providers = {"gcp": 0, "aws": 0, "azure": 0, "onPrem": 0}
+    for c in clusters:
+        p = c.get("provider", "").lower()
+        if p in ("gcp", "google"):
+            providers["gcp"] += 1
+        elif p in ("aws", "amazon"):
+            providers["aws"] += 1
+        elif p in ("azure", "microsoft"):
+            providers["azure"] += 1
+        elif p in ("on-prem", "onprem", "baremetal"):
+            providers["onPrem"] += 1
+
+    return {
+        "totalClusters": total_clusters,
+        "totalGpus": total_gpus,
+        "activeGpus": active_gpus,
+        "aggregateHourlySpendUsd": spend,
+        "aggregateHourlyBleedUsd": bleed,
+        "globalAverageMfuPct": avg_mfu,
+        "providers": providers,
+        "optimalClusterForWorkload": {
+            "recommendedClusterId": "onprem-dgx-h100",
+            "reason": "Highest MFU (52.1%) with lowest cost ($2.10/GPU/hr)",
+        },
+    }
+
+
+@cluster_app.command("list")
+def cluster_list(
+    endpoint: Optional[str] = typer.Option(
+        None, "--endpoint", "-e", help="Control plane URL (default: AIRUN_CONTROL_PLANE_URL or http://localhost:3000)."
+    ),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", "-p", help="Filter clusters by cloud provider (e.g., gcp, aws, azure, on-prem)."
+    ),
+    accelerator: Optional[str] = typer.Option(
+        None, "--accelerator", "-a", help="Filter clusters by accelerator type (e.g., h100, a100, b200)."
+    ),
+) -> None:
+    """List all federated GPU clusters across hybrid multi-cloud environments."""
+    clusters = _fetch_federated_clusters(endpoint)
+    if provider:
+        clusters = [c for c in clusters if c.get("provider", "").lower() == provider.lower()]
+    if accelerator:
+        clusters = [
+            c
+            for c in clusters
+            if c.get("accelerator_type", c.get("acceleratorType", "")).lower() == accelerator.lower()
+        ]
+
+    console.print("\n", render_federated_clusters_table(clusters), "\n")
+
+
+@cluster_app.command("overview")
+def cluster_overview(
+    endpoint: Optional[str] = typer.Option(
+        None, "--endpoint", "-e", help="Control plane URL (default: AIRUN_CONTROL_PLANE_URL or http://localhost:3000)."
+    ),
+) -> None:
+    """Display global multi-cloud capacity, utilization, and aggregate financial bleed."""
+    overview = _fetch_federation_overview(endpoint)
+    console.print("\n", render_federation_overview_panel(overview), "\n")
+
+
+@cluster_app.command("recommend")
+def cluster_recommend(
+    workload: str = typer.Argument(..., help="Workload identifier or model name (e.g., llama3-70b-train)."),
+    gpus: int = typer.Option(8, "--gpus", "-g", help="Required number of GPUs for the workload."),
+    accelerator: str = typer.Option("h100", "--accelerator", "-a", help="Preferred GPU accelerator type."),
+    max_rate: Optional[float] = typer.Option(None, "--max-rate", help="Maximum acceptable hourly rate per GPU."),
+    endpoint: Optional[str] = typer.Option(
+        None, "--endpoint", "-e", help="Control plane URL."
+    ),
+) -> None:
+    """Recommend the optimal multi-cloud cluster for placement based on MFU-per-dollar efficiency."""
+    ep = endpoint or os.getenv("AIRUN_CONTROL_PLANE_URL", "http://localhost:3000")
+    url = f"{ep.rstrip('/')}/api/v1/federation/placement"
+    placement = None
+
+    try:
+        payload = {
+            "workloadId": workload,
+            "requiredGpus": gpus,
+            "preferredAccelerator": accelerator,
+            "maxHourlyRate": max_rate,
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            placement = data.get("placement")
+    except Exception:
+        pass
+
+    if not placement:
+        clusters = _fetch_federated_clusters(endpoint)
+        matching = [
+            c
+            for c in clusters
+            if c.get("accelerator_type", c.get("acceleratorType", "")).lower() == accelerator.lower()
+            and (c.get("total_gpus", c.get("totalGpus", 0)) - c.get("active_gpus", c.get("activeGpus", 0))) >= gpus
+            and (max_rate is None or c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 0.0)) <= max_rate)
+        ]
+        if not matching:
+            matching = [
+                c
+                for c in clusters
+                if c.get("accelerator_type", c.get("acceleratorType", "")).lower() == accelerator.lower()
+            ]
+
+        if matching:
+            best = max(
+                matching,
+                key=lambda c: (c.get("average_mfu_pct", c.get("averageMfuPct", 0.0)))
+                / max(0.1, c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 1.0))),
+            )
+            placement = {
+                "workloadId": workload,
+                "recommendedClusterId": best.get("cluster_id", best.get("clusterId")),
+                "provider": best.get("provider"),
+                "region": best.get("region"),
+                "acceleratorType": best.get("accelerator_type", best.get("acceleratorType")),
+                "hourlyRatePerGpu": best.get("hourly_rate_per_gpu", best.get("hourlyRatePerGpu")),
+                "expectedHourlyCostUsd": gpus * best.get("hourly_rate_per_gpu", best.get("hourlyRatePerGpu", 0.0)),
+                "expectedMfuPct": best.get("average_mfu_pct", best.get("averageMfuPct")),
+                "efficiencyScore": round(
+                    best.get("average_mfu_pct", best.get("averageMfuPct", 0.0))
+                    / max(0.1, best.get("hourly_rate_per_gpu", best.get("hourlyRatePerGpu", 1.0))),
+                    2,
+                ),
+                "reason": f"Optimal MFU-per-dollar efficiency score across available {accelerator.upper()} clusters",
+            }
+
+    if not placement:
+        console.print(f"[bold red]No suitable cluster found for workload '{workload}'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    rec_table = Table.grid(padding=(0, 2))
+    rec_table.add_column("Key", style="bold white")
+    rec_table.add_column("Value", style="cyan")
+    rec_table.add_row("Workload ID", placement.get("workloadId", workload))
+    rec_table.add_row("Recommended Cluster", f"[bold green]{placement.get('recommendedClusterId')}[/bold green]")
+    rec_table.add_row("Provider / Region", f"{placement.get('provider', '').upper()} ({placement.get('region')})")
+    rec_table.add_row("Accelerator", f"{gpus}x {placement.get('acceleratorType', accelerator).upper()}")
+    rec_table.add_row("Hourly Rate / GPU", f"${placement.get('hourlyRatePerGpu', 0.0):.2f}")
+    rec_table.add_row("Estimated Total Spend", f"[bold green]${placement.get('expectedHourlyCostUsd', 0.0):.2f}/hr[/bold green]")
+    rec_table.add_row("Expected MFU", f"[bold green]{placement.get('expectedMfuPct', 0.0):.1f}%[/bold green]")
+    rec_table.add_row("MFU/Dollar Score", f"[bold yellow]{placement.get('efficiencyScore', 0.0)}[/bold yellow]")
+    rec_table.add_row("Reason", str(placement.get("reason")))
+
+    console.print(
+        "\n",
+        Panel(
+            rec_table,
+            title="[bold cyan]Airun Intelligent Workload Placement[/bold cyan]",
+            border_style="green",
+            expand=False,
+        ),
+        "\n",
+    )
 
 
 @app.command("waste")

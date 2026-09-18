@@ -14,11 +14,75 @@ from typing import Any
 from airun.analysis.analyzer import analyze_spans
 from airun.analysis.comparator import compare_traces
 from airun.analysis.waste import detect_compute_waste
+from airun.events.models import SpanKind
 from airun.incident.graph import build_sample_incident_graph
+from airun.pricing.energy import calculate_energy
 from airun.resilience.breaker import get_resilience_manager
 from airun.resilience.dr_drills import run_disaster_recovery_drill
 from airun.routing.frontier import get_efficient_frontier
+from airun.sdk.tracer import record_retry, set_span_metadata, set_span_tokens, trace
 from airun.store import get_trace_store
+
+
+def seed_demo_traces() -> list[str]:
+    """Generate realistic diverse demo traces for instant UI exploration."""
+    trace_ids = []
+
+    # 1. Multi-Agent Research Pipeline (Claude 3.5 Sonnet + GPT-4o + Gemini 1.5 Pro)
+    with trace("multi_agent_research_pipeline", kind=SpanKind.WORKFLOW) as root1:
+        with trace("agent_planning", kind=SpanKind.AGENT_STEP):
+            with trace("planner_llm", kind=SpanKind.LLM, model="gpt-4o", provider="openai"):
+                set_span_tokens(input_tokens=1540, output_tokens=320)
+        with trace("agent_researcher", kind=SpanKind.AGENT_STEP):
+            with trace("research_llm", kind=SpanKind.LLM, model="claude-3-5-sonnet", provider="anthropic"):
+                set_span_tokens(input_tokens=4200, output_tokens=1850)
+            with trace("vector_search", kind=SpanKind.DB, provider="qdrant"):
+                set_span_metadata({"top_k": 5, "similarity": 0.92})
+        with trace("agent_critic", kind=SpanKind.AGENT_STEP):
+            with trace("critic_llm", kind=SpanKind.LLM, model="gemini-1.5-pro", provider="gemini"):
+                set_span_tokens(input_tokens=3100, output_tokens=450)
+        with trace("agent_synthesizer", kind=SpanKind.AGENT_STEP):
+            with trace("synth_llm", kind=SpanKind.LLM, model="gpt-4o-mini", provider="openai"):
+                set_span_tokens(input_tokens=2200, output_tokens=680)
+    trace_ids.append(root1.trace_id)
+
+    # 2. Customer Support RAG with Vector Search & Cohere Reranking
+    with trace("customer_support_rag", kind=SpanKind.WORKFLOW) as root2:
+        with trace("query_embedding", kind=SpanKind.LLM, model="text-embedding-3-small", provider="openai"):
+            set_span_tokens(input_tokens=48, output_tokens=0)
+        with trace("hybrid_search", kind=SpanKind.DB, provider="pinecone"):
+            set_span_metadata({"index": "kb-v2", "matches": 8})
+        with trace("cohere_rerank", kind=SpanKind.TOOL, provider="cohere"):
+            set_span_metadata({"top_n": 3})
+        with trace("rag_generation", kind=SpanKind.LLM, model="gpt-4o", provider="openai"):
+            set_span_tokens(input_tokens=3450, output_tokens=480)
+    trace_ids.append(root2.trace_id)
+
+    # 3. Distributed GPU Pretraining Step on 8x H100 SXM5
+    with trace("h100_pretrain_forward_backward", kind=SpanKind.WORKFLOW) as root3:
+        with trace("dataloader_fetch", kind=SpanKind.AGENT_STEP):
+            set_span_metadata({"batch_size": 16, "num_workers": 4, "pin_memory": False})
+        with trace("gemm_forward_pass", kind=SpanKind.AGENT_STEP) as s_gemm:
+            s_gemm.accelerator_type = "h100"
+            nrg = calculate_energy(duration_ms=45.0, accelerator="h100", utilization_pct=0.82)
+            s_gemm.power_watts = nrg.power_watts
+            s_gemm.energy_joules = nrg.energy_joules
+            set_span_metadata({"tensor_dim": "8192x8192", "dtype": "fp16"})
+        with trace("nccl_allreduce_sync", kind=SpanKind.AGENT_STEP):
+            set_span_metadata({"ring_gpus": 8, "collective": "all_reduce", "wait_ms": 14.2})
+    trace_ids.append(root3.trace_id)
+
+    # 4. Resilience Drill: Model API Failover with Transient Retry
+    with trace("payment_gateway_agent", kind=SpanKind.WORKFLOW) as root4:
+        with trace("auth_check", kind=SpanKind.AGENT_STEP):
+            set_span_metadata({"user_id": "usr-9281"})
+        with trace("primary_provider_call", kind=SpanKind.LLM, model="gpt-4o", provider="openai"):
+            record_retry()
+            set_span_metadata({"error": "503 Service Unavailable", "retry_count": 1})
+            set_span_tokens(input_tokens=850, output_tokens=120)
+    trace_ids.append(root4.trace_id)
+
+    return trace_ids
 
 
 class AirunServerHandler(BaseHTTPRequestHandler):
@@ -43,6 +107,21 @@ class AirunServerHandler(BaseHTTPRequestHandler):
         payload = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _send_text(
+        self,
+        text: str,
+        content_type: str = "text/plain; version=0.0.4; charset=utf-8",
+        status: int = 200,
+    ):
+        """Helper to send plain text / Prometheus metrics response."""
+        payload = text.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
@@ -81,6 +160,47 @@ class AirunServerHandler(BaseHTTPRequestHandler):
             self._send_json(report.model_dump())
             return
 
+        # OTLP Trace Ingestion Endpoint
+        if path in ("/v1/traces", "/api/traces"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                data = json.loads(post_body.decode("utf-8")) if post_body else {}
+                from airun.exporters.otlp import otlp_payload_to_trace_records
+
+                traces = otlp_payload_to_trace_records(data)
+                store = get_trace_store()
+                ingested = []
+                for tr in traces:
+                    store.save_trace(tr)
+                    ingested.append(tr.trace_id)
+                self._send_json(
+                    {
+                        "status": "success",
+                        "ingested": ingested,
+                        "count": len(ingested),
+                    }
+                )
+            except Exception as e:
+                self._send_json({"status": "error", "message": str(e)}, status=400)
+            return
+
+        # One-Click Demo Workload Seeding Endpoint (POST)
+        if path in ("/api/demo", "/api/seed"):
+            try:
+                trace_ids = seed_demo_traces()
+                self._send_json(
+                    {
+                        "status": "success",
+                        "message": f"Successfully generated {len(trace_ids)} realistic example AI workloads",
+                        "trace_ids": trace_ids,
+                        "count": len(trace_ids),
+                    }
+                )
+            except Exception as e:
+                self._send_json({"status": "error", "message": str(e)}, status=500)
+            return
+
         self._send_json({"error": "Endpoint not found"}, status=404)
 
     def do_GET(self):
@@ -88,6 +208,22 @@ class AirunServerHandler(BaseHTTPRequestHandler):
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path.rstrip("/")
         query_params = urllib.parse.parse_qs(parsed_url.query)
+
+        # One-Click Demo Workload Seeding Endpoint (GET for browser/curl convenience)
+        if path in ("/api/demo", "/api/seed"):
+            try:
+                trace_ids = seed_demo_traces()
+                self._send_json(
+                    {
+                        "status": "success",
+                        "message": f"Successfully generated {len(trace_ids)} realistic example AI workloads",
+                        "trace_ids": trace_ids,
+                        "count": len(trace_ids),
+                    }
+                )
+            except Exception as e:
+                self._send_json({"status": "error", "message": str(e)}, status=500)
+            return
 
         # Health check endpoint (for AWS ALB / Kubernetes liveness probe)
         if path == "/healthz" or path == "/health":
@@ -98,6 +234,85 @@ class AirunServerHandler(BaseHTTPRequestHandler):
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             )
+            return
+
+        # Prometheus / OpenMetrics Exporter
+        if path == "/metrics":
+            store = get_trace_store()
+            summaries = store.list_traces(limit=500)
+            manager = get_resilience_manager()
+
+            lines = [
+                "# HELP airun_traces_total Total number of execution traces profiled by airun.",
+                "# TYPE airun_traces_total counter",
+            ]
+            success_count = sum(
+                1
+                for s in summaries
+                if str(s.outcome).lower() in ("success", "spanstatus.success")
+            )
+            error_count = len(summaries) - success_count
+            lines.append(f'airun_traces_total{{status="success"}} {success_count}')
+            lines.append(f'airun_traces_total{{status="error"}} {error_count}')
+
+            lines.append(
+                "# HELP airun_cost_usd_total Total cost incurred by profiled models in USD."
+            )
+            lines.append("# TYPE airun_cost_usd_total counter")
+            total_cost = sum(s.total_cost_usd or 0.0 for s in summaries)
+            lines.append(f"airun_cost_usd_total {total_cost:.4f}")
+
+            lines.append(
+                "# HELP airun_tokens_total Total tokens processed across all workloads."
+            )
+            lines.append("# TYPE airun_tokens_total counter")
+            total_tokens = sum(s.total_tokens or 0 for s in summaries)
+            lines.append(f"airun_tokens_total {total_tokens}")
+
+            lines.append(
+                "# HELP airun_wasted_cost_usd_total Total detected financial bleed and wasted spend in USD."
+            )
+            lines.append("# TYPE airun_wasted_cost_usd_total counter")
+            total_wasted = sum(s.wasted_cost_usd or 0.0 for s in summaries)
+            lines.append(f"airun_wasted_cost_usd_total {total_wasted:.4f}")
+
+            lines.append(
+                "# HELP airun_circuit_breaker_state Current state of resilience circuit breakers (0=CLOSED, 1=HALF_OPEN, 2=OPEN)."
+            )
+            lines.append("# TYPE airun_circuit_breaker_state gauge")
+            for status in manager.get_all_statuses():
+                val = (
+                    0
+                    if status.state.value == "closed"
+                    else (1 if status.state.value == "half_open" else 2)
+                )
+                lines.append(
+                    f'airun_circuit_breaker_state{{provider="{status.provider}"}} {val}'
+                )
+
+            lines.append("")
+            self._send_text("\n".join(lines))
+            return
+
+        # API: Server-Sent Events (SSE) Live Telemetry Stream
+        if path == "/api/live/stream":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            store = get_trace_store()
+            latest = store.list_traces(limit=1)
+            event_data = {
+                "type": "heartbeat",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "latest_trace": latest[0].model_dump() if latest else None,
+            }
+            msg = f"data: {json.dumps(event_data, default=str)}\n\n"
+            self.wfile.write(msg.encode("utf-8"))
+            self.wfile.flush()
             return
 
         # API: List all trace summaries
@@ -652,6 +867,7 @@ def get_dashboard_html() -> str:
         </div>
       </div>
       <div class="nav-actions">
+        <button class="btn btn-primary" onclick="seedExampleData()" id="btn-seed-data" style="background: linear-gradient(135deg, #10b981, #059669); border-color: #059669; box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);">⚡ Load Example Data</button>
         <button class="btn" onclick="fetchExecutiveMetrics(); fetchTraces();">🔄 Refresh</button>
         <button class="btn btn-primary" onclick="switchTab('tab-dr'); runDisasterRecoveryDrill();">⚡ Run DR Drill</button>
       </div>
@@ -1011,7 +1227,30 @@ def get_dashboard_html() -> str:
         tbody.innerHTML = '';
 
         if (traces.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No traces found. Run python examples/live_multi_model_agent.py to record telemetry!</td></tr>';
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align:center; padding:32px 16px; color:var(--text-muted);">
+                <div style="font-size:0.95rem; margin-bottom:10px; color:#fff; font-weight:600;">No execution traces found yet.</div>
+                <p style="font-size:0.8rem; margin-bottom:14px; color:var(--text-muted);">Load pre-configured multi-agent, RAG, and GPU pretraining traces with one click:</p>
+                <button class="btn btn-primary" onclick="seedExampleData()" style="background: linear-gradient(135deg, #10b981, #059669); border-color: #059669; font-size:0.85rem; padding:8px 16px;">
+                  ⚡ Load Example AI Workloads
+                </button>
+              </td>
+            </tr>
+          `;
+          const detail = document.getElementById('detail-content');
+          if (detail) {
+            detail.innerHTML = `
+              <div style="text-align:center; padding:50px 20px; color:var(--text-muted);">
+                <div style="font-size:2.5rem; margin-bottom:12px;">🚀</div>
+                <h3 style="color:#fff; margin-bottom:8px; font-size:1.15rem;">Welcome to airun Command Center</h3>
+                <p style="margin-bottom:20px; font-size:0.85rem; max-width:420px; margin-left:auto; margin-right:auto;">Click below to populate your workspace with realistic multi-agent workflows, RAG embeddings, and distributed H100 GPU traces.</p>
+                <button class="btn btn-primary" onclick="seedExampleData()" style="background: linear-gradient(135deg, #10b981, #059669); border-color: #059669; font-size:0.95rem; padding:10px 22px; box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);">
+                  ⚡ Load Example AI Workloads
+                </button>
+              </div>
+            `;
+          }
           return;
         }
 
@@ -1043,6 +1282,34 @@ def get_dashboard_html() -> str:
         if (traces.length > 0) loadTraceDetail(traces[0].trace_id);
       } catch (err) {
         console.error("Failed to load traces", err);
+      }
+    }
+
+    async function seedExampleData() {
+      const btn = document.getElementById('btn-seed-data');
+      const origText = btn ? btn.innerHTML : '⚡ Load Example Data';
+      if (btn) {
+        btn.innerHTML = '⏳ Loading Workloads...';
+        btn.disabled = true;
+      }
+      try {
+        const res = await fetch('/api/demo', { method: 'POST' });
+        const data = await res.json();
+        if (btn) btn.innerHTML = '✅ 4 Workloads Loaded!';
+        setTimeout(() => {
+          if (btn) {
+            btn.innerHTML = origText;
+            btn.disabled = false;
+          }
+        }, 3000);
+        await fetchExecutiveMetrics();
+        await fetchTraces();
+      } catch (err) {
+        console.error("Failed to seed example data", err);
+        if (btn) {
+          btn.innerHTML = '❌ Error';
+          btn.disabled = false;
+        }
       }
     }
 

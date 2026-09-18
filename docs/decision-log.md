@@ -69,3 +69,18 @@
 - **Context**: Developers need instant local profiling without cloud accounts, but platform engineering teams require centralized cluster visibility and automated remediation.
 - **Decision**: Maintain a dual-mode topology: standalone zero-dependency local CLI/SQLite for individual engineers, and a TypeScript/Express control plane with PostgreSQL for multi-node enterprise deployments.
 - **Consequences**: Optimal developer experience without sacrificing enterprise observability requirements.
+
+---
+
+## ADR 011: Native Prometheus Exporters & Standard OTLP Ingestion
+- **Context**: Enterprise operations teams already run Prometheus and OpenTelemetry collectors; custom metrics formats increase operational friction.
+- **Decision**: Expose native OpenMetrics on port 9445 in the Rust collector for physical GPU metrics, provide `/metrics` on the Python web server, and implement standard OTLP ingestion (`POST /v1/traces`) in both Python and TypeScript control planes.
+- **Consequences**: Zero-code integration with standard Grafana, Datadog, Prometheus, LangChain, and LiteLLM infrastructure.
+
+---
+
+## ADR 012: Automated Closed-Loop Remediation Policy Engine
+- **Context**: Passive observability provides insights, but ongoing human intervention is required to fix runaway financial bleed or route around degraded model providers.
+- **Decision**: Implement an autonomous policy engine (`RemediationEngine`) that evaluates real-time trace economics and silicon health against declarative rules, triggering closed-loop Pareto model shifts, circuit breaker trips, and webhook alerts.
+- **Consequences**: Autonomous self-healing infrastructure that actively bounds cloud expenditure and guarantees SLA continuity.
+

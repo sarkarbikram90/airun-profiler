@@ -32,9 +32,19 @@ Observe → Explain → Optimize → Control → Automate
 
 ---
 
-## Phase 3: Distributed Agent Fleets & Cluster Autonomics (v0.2.0)
-- [ ] **eBPF Network Fabric Tracing**: Kernel-level RoCE/InfiniBand packet loss detection and NCCL buffer queue inspection.
-- [ ] **Multi-Cluster Federation**: Centralized control-plane state aggregation across hybrid clouds (AWS EKS + GCP GKE + on-premise GPU clusters).
+## Phase 2.5: Enterprise Standards & Closed-Loop Remediation (v0.1.5) — COMPLETED
+- [x] **Native Prometheus / OpenMetrics Exporters (`/metrics`)**: Port 9445 DaemonSet HTTP exporter for DCGM metrics and Python `/metrics` gauge exporter.
+- [x] **Standard OTLP Trace Ingestion Receiver (`POST /v1/traces`)**: Native OpenTelemetry collector endpoint in both Python and TypeScript control plane.
+- [x] **Real-Time Live Streaming (WebSockets & SSE)**: Live WebSocket broadcast server (`/ws/live`) and Server-Sent Events (`/api/live/stream`).
+- [x] **Automated Closed-Loop Remediation Policy Engine**: Active autonomous optimization with Pareto routing shifts, circuit breaker trips, and webhook alerts (`airun policy [list|evaluate]`).
+- [x] **High-Throughput Concurrency & Load Benchmark Suite**: Multi-threaded stress testing (50 threads / 1,050 spans, p99 < 1.5ms) and 100k samples Rust ring buffer.
+
+---
+
+## Phase 3: Distributed Agent Fleets & Cluster Autonomics (v0.2.0) — COMPLETED
+- [x] **In-Kernel eBPF Network Fabric Tracing**: Kernel tracepoint probes (`kfree_skb`, `net_dev_xmit`, `rdma_retransmit`) for RoCE/InfiniBand packet drops, PFC pause frame storms, and NCCL buffer queue inspection in Rust and Python.
+- [x] **Multi-Cluster Cross-Cloud Federation**: Centralized control-plane state aggregation and intelligent MFU-per-dollar placement across hybrid multi-cloud clusters (GCP GKE + AWS EKS + Azure AKS + on-premise DGX SuperPOD).
+- [x] **Live Silicon CI Hardware Testing**: Physical NVIDIA H100/A100 GPU hardware verification test suite, Kubernetes GPU self-hosted runner manifest (`deploy/ci/gpu-runner.yaml`), and dedicated GitHub Actions workflow (`.github/workflows/gpu-hardware-ci.yml`).
 - [ ] **Automated Remediation Loop**: Autonomic worker scaling, automated `torch.compile` injection, and dynamic batch size tuning.
 - [ ] **Prompt Prefix Cache Optimizer**: Predictive ROI modeling for OpenAI and Anthropic prefix cache hits.
 - [ ] **LangChain, LlamaIndex, CrewAI, and AutoGen Native Hooks**: Zero-code automatic callback instrumentation.
@@ -45,3 +55,4 @@ Observe → Explain → Optimize → Control → Automate
 - [ ] Multi-tenant RBAC with SSO/SAML authentication.
 - [ ] FinOps budget allocation & chargeback tagging by business unit/team.
 - [ ] SOC2 Type II compliance audit logs and cryptographic trace attestations.
+

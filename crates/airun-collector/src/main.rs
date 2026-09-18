@@ -2,7 +2,9 @@
 
 mod circuit_breaker;
 mod dcgm;
+mod ebpf;
 mod otlp;
+mod prometheus;
 mod pubsub;
 
 use circuit_breaker::{CircuitBreaker, BreakerConfig};
@@ -47,6 +49,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let breaker = CircuitBreaker::new("openai-h100-pool".into(), Some(BreakerConfig::default()));
 
     println!("  * Circuit Breaker: Initial state = {:?}", breaker.state());
+
+    // Spawn Prometheus metrics exporter on port 9445 (matching Kubernetes DaemonSet spec)
+    let prom_port: u16 = env::var("PROMETHEUS_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(9445);
+    let prom_ring_buffer = Arc::clone(&ring_buffer);
+    let prom_node = node_name.clone();
+    let prom_accel = accelerator_type.clone();
+    tokio::spawn(async move {
+        let addr = format!("0.0.0.0:{}", prom_port);
+        match tokio::net::TcpListener::bind(&addr).await {
+            Ok(listener) => {
+                println!("  * Prometheus Metrics Exporter: listening on http://{}/metrics", addr);
+                loop {
+                    if let Ok((mut socket, _)) = listener.accept().await {
+                        let rb = Arc::clone(&prom_ring_buffer);
+                        let n_name = prom_node.clone();
+                        let a_type = prom_accel.clone();
+                        tokio::spawn(async move {
+                            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                            let mut buf = [0u8; 1024];
+                            if let Ok(n) = socket.read(&mut buf).await {
+                                if n > 0 {
+                                    let request = String::from_utf8_lossy(&buf[..n]);
+                                    if request.starts_with("GET /metrics") || request.starts_with("GET / ") {
+                                        let body = prometheus::format_prometheus_metrics(&rb, &n_name, &a_type);
+                                        let resp = format!(
+                                            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                            body.len(),
+                                            body
+                                        );
+                                        let _ = socket.write_all(resp.as_bytes()).await;
+                                    } else {
+                                        let resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                                        let _ = socket.write_all(resp.as_bytes()).await;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[!] Could not bind Prometheus metrics exporter on port {}: {}", prom_port, e);
+            }
+        }
+    });
 
     // Spawn high-throughput OTLP HTTP ingestion server on port 4318
     let otlp_port: u16 = env::var("OTLP_PORT")

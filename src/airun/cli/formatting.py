@@ -418,6 +418,14 @@ def render_dr_drill_panel(report: Any) -> Panel:
     table.add_row("Drill ID", report.drill_id)
     table.add_row("Scenario", report.scenario)
 
+    drill_mode = getattr(report, "drill_mode", "simulated_catalog")
+    mode_tag = (
+        "[bold green][LIVE EXECUTED][/bold green]"
+        if drill_mode == "live_executed"
+        else "[bold yellow][SIMULATED — MODEL CATALOG ESTIMATE][/bold yellow]"
+    )
+    table.add_row("Execution Mode", mode_tag)
+
     status_tag = (
         "[bold green][OK] CONTINUITY PRESERVED[/bold green]"
         if report.business_continuity_preserved
@@ -702,6 +710,12 @@ def render_hardware_bleed_panel(diagnosis: Any) -> Panel:
     table.add_column("Details", style="cyan")
 
     table.add_row("Workload", f"{diagnosis.workload_name} ({diagnosis.num_gpus}x {diagnosis.accelerator.upper()})")
+    source_tag = (
+        "[bold green][MEASURED HARDWARE][/bold green]"
+        if not getattr(diagnosis, "is_estimated", True)
+        else "[bold yellow][ARCHITECTURAL ESTIMATE][/bold yellow]"
+    )
+    table.add_row("Telemetry Source", source_tag)
     table.add_row("Bottleneck", f"[bold red]{diagnosis.primary_bottleneck}[/bold red]")
     table.add_row("Symptom", f"[bold yellow]{diagnosis.symptom}[/bold yellow]")
     table.add_row(
@@ -800,4 +814,146 @@ def render_workload_waste_panel(
         border_style="bright_blue",
         expand=False,
     )
+
+
+def render_remediation_rules_table(rules: list) -> Table:
+    """Render declarative remediation rules table."""
+    table = Table(
+        title="[bold cyan]Airun Closed-Loop Remediation Rules[/bold cyan]",
+        border_style="cyan",
+        show_header=True,
+    )
+    table.add_column("Rule Name", style="bold white", overflow="fold")
+    table.add_column("Condition", style="yellow")
+    table.add_column("Threshold", style="magenta")
+    table.add_column("Action", style="bold green")
+    table.add_column("Target", style="cyan")
+    table.add_column("Status", style="green")
+
+    for r in rules:
+        status_str = "[green]ENABLED[/green]" if r.enabled else "[dim]DISABLED[/dim]"
+        action_name = r.action.value if hasattr(r.action, "value") else str(r.action)
+        table.add_row(
+            r.name,
+            r.condition_type,
+            str(r.threshold),
+            action_name,
+            r.target,
+            status_str,
+        )
+    return table
+
+
+def render_remediation_results_panel(results: list, trace_id: str) -> Panel:
+    """Render remediation results from evaluating a trace."""
+    if not results:
+        return Panel(
+            "[bold green][OK] All remediation guardrails passed. Trace is fully within economic and quality thresholds.[/bold green]",
+            title=f"[bold green]Closed-Loop Remediation: {trace_id}[/bold green]",
+            border_style="green",
+            expand=False,
+        )
+
+    table = Table(
+        title="[bold yellow]Autonomous Remediation Interventions Triggered[/bold yellow]",
+        border_style="yellow",
+        show_header=True,
+    )
+    table.add_column("Rule Triggered", style="bold red")
+    table.add_column("Observed Metric", style="yellow")
+    table.add_column("Threshold", style="white")
+    table.add_column("Action Taken", style="bold cyan")
+
+    for res in results:
+        table.add_row(
+            res.rule_name,
+            f"{res.metric_value:.2f}",
+            f"{res.threshold_value:.2f}",
+            res.action_taken,
+        )
+
+    return Panel(
+        table,
+        title=f"[bold red]! Closed-Loop Remediation Executed: {trace_id}[/bold red]",
+        border_style="red",
+        expand=False,
+    )
+
+
+def render_federated_clusters_table(clusters: list) -> Table:
+    """Render multi-cluster cross-cloud federation table."""
+    table = Table(
+        title="[bold cyan]Airun Multi-Cluster Cross-Cloud Federation[/bold cyan]",
+        border_style="cyan",
+        show_header=True,
+    )
+    table.add_column("Cluster ID", style="bold white")
+    table.add_column("Provider", style="yellow")
+    table.add_column("Region", style="cyan")
+    table.add_column("Accelerator", style="magenta")
+    table.add_column("GPUs", style="white")
+    table.add_column("Rate/GPU", style="green")
+    table.add_column("Avg MFU", style="bold green")
+    table.add_column("Bleed/hr", style="bold red")
+    table.add_column("Status", style="bold green")
+
+    for c in clusters:
+        table.add_row(
+            c.get("cluster_id", c.get("clusterId", "")),
+            c.get("provider", ""),
+            c.get("region", ""),
+            c.get("accelerator_type", c.get("acceleratorType", "")),
+            f"{c.get('active_gpus', c.get('activeGpus', 0))}/{c.get('total_gpus', c.get('totalGpus', 0))}",
+            f"${c.get('hourly_rate_per_gpu', c.get('hourlyRatePerGpu', 0)):.2f}",
+            f"{c.get('average_mfu_pct', c.get('averageMfuPct', 0)):.1f}%",
+            f"${c.get('average_bleed_hourly_usd', c.get('averageBleedHourlyUsd', 0)):.2f}",
+            f"[green]{c.get('health_status', c.get('healthStatus', 'healthy')).upper()}[/green]",
+        )
+    return table
+
+
+def render_federation_overview_panel(overview: dict) -> Panel:
+    """Render global multi-cloud capacity, utilization, and financial bleed summary."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column("Metric", style="bold white")
+    grid.add_column("Value", style="cyan")
+
+    grid.add_row("Total Federated Clusters", str(overview.get("total_clusters", overview.get("totalClusters", 0))))
+    grid.add_row(
+        "Global GPU Footprint",
+        f"{overview.get('active_gpus', overview.get('activeGpus', 0))} active / {overview.get('total_gpus', overview.get('totalGpus', 0))} provisioned GPUs",
+    )
+    grid.add_row(
+        "Aggregate Hourly Spend",
+        f"[bold green]${overview.get('aggregate_hourly_spend_usd', overview.get('aggregateHourlySpendUsd', 0)):,.2f} / hr[/bold green]",
+    )
+    grid.add_row(
+        "Aggregate Financial Bleed",
+        f"[bold red]${overview.get('aggregate_hourly_bleed_usd', overview.get('aggregateHourlyBleedUsd', 0)):,.2f} / hr[/bold red]",
+    )
+    grid.add_row(
+        "Global Average MFU",
+        f"[bold green]{overview.get('global_average_mfu_pct', overview.get('globalAverageMfuPct', 0)):.1f}%[/bold green]",
+    )
+
+    prov = overview.get("providers", {})
+    grid.add_row(
+        "Provider Footprint",
+        f"GCP: {prov.get('gcp', 0)} | AWS: {prov.get('aws', 0)} | Azure: {prov.get('azure', 0)} | On-Prem: {prov.get('onPrem', prov.get('on_prem', 0))}",
+    )
+
+    opt = overview.get("optimal_cluster_for_workload", overview.get("optimalClusterForWorkload", {}))
+    if opt:
+        grid.add_row(
+            "Optimal Placement",
+            f"[bold yellow]{opt.get('recommendedClusterId', opt.get('recommended_cluster_id', ''))}[/bold yellow] ({opt.get('reason', '')})",
+        )
+
+    return Panel(
+        grid,
+        title="[bold cyan]Global Multi-Cloud Federation Overview[/bold cyan]",
+        border_style="bright_blue",
+        expand=False,
+    )
+
 

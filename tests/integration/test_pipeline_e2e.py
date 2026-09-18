@@ -120,3 +120,9 @@ async def test_end_to_end_pipeline_flow():
     assert pg_records["cost_record"]["accelerator"] == "H100-SXM5-80GB"
     assert pg_records["recommendation"]["table"] == "recommendations"
     assert pg_records["recommendation"]["status"] == "open"
+
+    # Verify None summary does not crash generate_postgres_records
+    record_no_sum = TraceRecord(trace_id="tr_no_sum", created_at=now_iso, summary=None, spans=spans)
+    pg_no_sum = engine.generate_postgres_records(workload_name, record_no_sum)
+    assert pg_no_sum["run"]["total_cost_usd"] == 0.0
+    assert pg_no_sum["cost_record"]["compute_cost_usd"] == 0.0
