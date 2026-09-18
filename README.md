@@ -4,7 +4,7 @@
   <a href="https://github.com/sarkarbikram90/airun-profiler/actions/workflows/ci.yml"><img src="https://github.com/sarkarbikram90/airun-profiler/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/v/airun-profiler?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://crates.io/crates/airun-collector"><img src="https://img.shields.io/crates/v/airun-collector.svg?color=orange&logo=rust&logoColor=white" alt="crates.io"></a>
-  <a href="https://docs.rs/airun-collector"><img src="https://img.shields.io/badge/docs.rs-v0.1.6-326CE5?logo=docs.rs&logoColor=white" alt="docs.rs"></a>
+  <a href="https://docs.rs/airun-collector"><img src="https://img.shields.io/docsrs/airun-collector?logo=docs.rs" alt="docs.rs"></a>
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/dm/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="Downloads"></a>
   <a href="https://github.com/sarkarbikram90/airun-profiler"><img src="https://img.shields.io/github/stars/sarkarbikram90/airun-profiler?style=social" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
