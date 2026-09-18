@@ -1,11 +1,16 @@
-﻿name: Live Silicon Hardware CI
+name: Live Silicon Hardware CI
 
+# Dedicated Physical Silicon Hardware CI
+# Triggered on-demand via workflow_dispatch when a self-hosted physical NVIDIA GPU runner is connected,
+# preventing routine code pushes from queuing indefinitely waiting for specialized silicon runners.
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      runner_label:
+        description: "Self-hosted runner label"
+        required: false
+        default: "gpu-h100"
+
 
 jobs:
   silicon-hardware-verification:
