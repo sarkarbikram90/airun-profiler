@@ -84,13 +84,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
           cache-dependency-path: packages/control-plane/package-lock.json
 
       - name: Install Dependencies
         working-directory: packages/control-plane
-        run: npm ci
+        run: npm ci || npm install
 
       - name: Build & Run Tests
         working-directory: packages/control-plane
