@@ -1,0 +1,30 @@
+{
+  "benchmark": "trace_overhead",
+  "iterations_per_suite": 50000,
+  "environment": {
+    "python": "3.14.7",
+    "os": "Windows 11",
+    "arch": "AMD64"
+  },
+  "context_manager": {
+    "count": 50000,
+    "mean_us": 14.08,
+    "min_us": 11.5,
+    "p50_us": 12.4,
+    "p90_us": 14.8,
+    "p95_us": 16.8,
+    "p99_us": 48.4,
+    "max_us": 1783.6
+  },
+  "decorator": {
+    "count": 50000,
+    "mean_us": 10.75,
+    "min_us": 8.7,
+    "p50_us": 9.4,
+    "p90_us": 11.1,
+    "p95_us": 12.4,
+    "p99_us": 36.1,
+    "max_us": 1054.6
+  },
+  "verified_overhead_sub_20us": true
+}

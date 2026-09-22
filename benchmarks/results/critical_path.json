@@ -1,0 +1,26 @@
+{
+  "10_spans": {
+    "p50_us": 22.6,
+    "p90_us": 37.3,
+    "p95_us": 66.6,
+    "p99_us": 195.3,
+    "mean_us": 33.15,
+    "computed_critical_path_ms": 112.0
+  },
+  "50_spans": {
+    "p50_us": 137.0,
+    "p90_us": 258.2,
+    "p95_us": 338.6,
+    "p99_us": 690.7,
+    "mean_us": 177.92,
+    "computed_critical_path_ms": 112.0
+  },
+  "100_spans": {
+    "p50_us": 340.9,
+    "p90_us": 436.7,
+    "p95_us": 524.9,
+    "p99_us": 874.6,
+    "mean_us": 380.76,
+    "computed_critical_path_ms": 112.0
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "benchmark": "sqlite_persistence",
+  "records_tested": 2000,
+  "spans_per_record": 6,
+  "save_trace": {
+    "count": 2000,
+    "mean_ms": 7.159,
+    "p50_ms": 4.419,
+    "p90_ms": 5.218,
+    "p95_ms": 5.584,
+    "p99_ms": 8.763
+  },
+  "get_trace": {
+    "count": 500,
+    "mean_ms": 1.779,
+    "p50_ms": 0.994,
+    "p90_ms": 1.638,
+    "p95_ms": 1.972,
+    "p99_ms": 6.157
+  },
+  "per_span_save_p50_ms": 0.736,
+  "per_span_save_mean_ms": 1.193,
+  "verified_sub_1ms_per_span": true,
+  "verified_sub_1ms_query_p50": true
+}

@@ -5,10 +5,10 @@
   <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/v/airun-profiler?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://crates.io/crates/airun-collector"><img src="https://img.shields.io/crates/v/airun-collector.svg?color=orange&logo=rust&logoColor=white" alt="crates.io"></a>
   <a href="https://docs.rs/airun-collector"><img src="https://img.shields.io/docsrs/airun-collector?logo=docs.rs" alt="docs.rs"></a>
-  <a href="https://pypi.org/project/airun-profiler/"><img src="https://img.shields.io/pypi/dm/airun-profiler.svg?color=blue&logo=pypi&logoColor=white" alt="Downloads"></a>
+  <a href="https://pepy.tech/projects/airun-profiler"><img src="https://api.pepy.tech/badge/airun-profiler/month" alt="Downloads"></a>
   <a href="https://github.com/sarkarbikram90/airun-profiler"><img src="https://img.shields.io/github/stars/sarkarbikram90/airun-profiler?style=social" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/tests-144%20passed-brightgreen.svg" alt="Tests">
+  <a href="benchmarks/"><img src="https://img.shields.io/badge/Overhead-%3C20%CE%BCs-success.svg" alt="Overhead"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Ruff"></a>
 </p>
 
@@ -22,7 +22,6 @@
   <a href="docs/azure-aks-deployment-guide.md"><img src="https://img.shields.io/badge/Kubernetes-AKS%20DaemonSet-0078D4.svg?logo=kubernetes&logoColor=white" alt="Azure AKS"></a>
   <a href="deploy/helm/airun-data-plane"><img src="https://img.shields.io/badge/Helm-v3-0F1689.svg?logo=helm&logoColor=white" alt="Helm"></a>
   <a href="src/airun/exporters/otlp.py"><img src="https://img.shields.io/badge/OpenTelemetry-OTLP%20Native-F5A800.svg?logo=opentelemetry&logoColor=white" alt="OpenTelemetry"></a>
-  <img src="https://img.shields.io/badge/Overhead-%3C20%CE%BCs-success.svg" alt="Overhead">
 </p>
 
 <p align="center">
@@ -39,9 +38,64 @@
   <code>aks-daemonset</code>
 </p>
 
-> **"airun measures and optimizes the cost, latency, quality, and reliability of AI workloads."**
+---
 
-`airun` is a local-first **AI Infrastructure Reliability and Economics Platform** for Python 3.11+. It bridges the gap between physical silicon, data center electrical power, multi-model execution, and enterprise business continuity.
+### Stop Flying Blind on AI Infrastructure. Detect GPU Waste, Prevent Financial Bleed, and Enforce Model Reliability.
+
+| Question | Answer |
+| :--- | :--- |
+| **1. What is it?** | An open-source, local-first **AI Infrastructure Reliability & FinOps Platform** that bridges the gap between physical silicon telemetry (NVIDIA DCGM / NVLink / PCIe), LLM token economics, multi-agent execution graphs, and automated multi-provider failover. |
+| **2. Who is it for?** | **AI Engineers**, **MLOps / Platform Engineers**, and **Engineering Leaders (CTOs/CFOs)** building production LLM pipelines, autonomous multi-agent systems, or distributed GPU training/inference clusters. |
+| **3. Why does it exist?** | Traditional APMs (Datadog, New Relic) only see generic HTTP spans. They cannot correlate GPU streaming multiprocessor (SM) stalls or PCIe Gen1 throttling to wasted compute dollars, cannot compute Model FLOPs Utilization (MFU), cannot detect prompt context bloat, and cannot auto-switch across LLM providers when outages strike. |
+| **4. How to install?** | `pip install airun-profiler` (Python SDK & CLI) <br> `cargo install airun-collector` (High-frequency Rust node telemetry daemon) |
+| **5. What does it catch?** | Run `airun waste` to diagnose physical silicon starvation ($/hr bleed) and `airun golden-signals` to inspect your 4-layer physical-to-economic health metrics immediately. |
+
+```text
+$ airun waste latest --hardware
+
++--- ! HARDWARE WASTE DETECTED IN TRACE: 37a4d2533b5641618529039ee12456c6 ----+
+| Workload          research_agent_workflow (8x H100 SXM5)                    |
+| Telemetry Source  NVIDIA DCGM Real-Time Ingestion (Rust Collector)          |
+| Bottleneck        Dataloader Starvation (CPU/IO Bound)                      |
+| Symptom           GPU SM active cycles stalled at ~38.2% (idle wait)        |
+|                   while PCIe TX bus was idle (<400 MB/s)                    |
+| Financial Bleed   $1,599.36 / week ($9.52/hr | $6,854.40/mo)                |
+| Root Cause        Host CPU data loading workers starved accelerator between |
+|                   inference/training mini-batches                           |
+| Actionable Fix    Increase DataLoader num_workers=8, set pin_memory=True,   |
+|                   and pre-fetch input tensors                               |
+| Expected Impact   throughput_gain: +31%, waste_reduction: -82%,             |
+|                   weekly_cost_savings: $1,279.49                            |
++-----------------------------------------------------------------------------+
+
+$ airun golden-signals latest
+
++---------------- AI Infrastructure Golden Signals Hierarchy -----------------+
+|       1. Economics (CFO View)           2. Efficiency (ML Engineer View)    |
+| +----------------------------------+  +-----------------------------------+ |
+| | Signal          | Value          |  | Signal             | Value        | |
+| |-----------------+----------------|  |--------------------+--------------| |
+| | Cost / Eff      | $87.33         |  | Model FLOPs Util   | 62.0%        | |
+| | GPU-Hour        |                |  | (MFU)              |              | |
+| | Cost / 1M       | $1.5647        |  | Achieved           | 250.0 TFLOPS | |
+| | Tokens          |                |  | Throughput         |              | |
+| | Financial Bleed | $0.38/hr       |  | GPU SM Utilization | 78.0%        | |
+| | Wasted Spend    | $0.0018 (20.8%)|  | Memory Bandwidth   | 64.0%        | |
+| +----------------------------------+  +-----------------------------------+ |
+|                                                                             |
+|    3. Reliability (Platform View)      4. Infrastructure (Physical Layer)   |
+| +----------------------------------+  +-----------------------------------+ |
+| | Signal            | Value        |  | Signal          | Value           | |
+| |-------------------+--------------|  |-----------------+-----------------| |
+| | Job Failure Rate  | 0.0%         |  | Active Power    | 274 W (PUE      | |
+| | Mean Recovery     | 0ms          |  | Draw            | 1.20)           | |
+| | Time              |              |  | Thermal         | No Throttling   | |
+| | Step Retries      | 1            |  | Throttling      |                 | |
+| | Checkpoint        | Every 15 min |  | PCIe Bus Errors | 0               | |
+| | Cadence           |              |  | Network Retrans | 2.00%           | |
+| +----------------------------------+  +-----------------------------------+ |
++-----------------------------------------------------------------------------+
+```
 
 ---
 
@@ -61,7 +115,7 @@
 - **Zero-Friction Tracing**: Universal `@trace` decorator and `with trace()` context manager.
 - **Concurrent Critical Path**: Accurately computes critical-path latency across parallel tools using interval DAG scheduling.
 - **Privacy by Default**: Automatic API key and sensitive token redaction. Prompt and completion contents are never stored without explicit opt-in.
-- **Ultra-Low Overhead**: Measured in-memory span overhead is $<20\mu\text{s}$ and total SQLite persistence overhead is $<1\text{ms}$ per workflow.
+- **Ultra-Low Overhead & High Throughput**: Measured in-memory span profiling overhead is $<20\mu\text{s}$ (p50: **9.40 $\mu$s**), interval DAG critical path resolution is sub-millisecond, and trace query latency is $<1\text{ms}$. See verified, reproducible benchmarks in [`benchmarks/`](benchmarks/).
 
 ---
 
@@ -380,6 +434,7 @@ python examples/lab/run_all.py
   - [Azure Kubernetes Service (Azure AKS) Deployment Guide](docs/azure-aks-deployment-guide.md)
 - **Technical Architecture & Specifications**:
   - [System Architecture & Distributed Data Path](docs/architecture.md)
+  - [Reproducible Performance Benchmarks](benchmarks/README.md)
   - [Master Product Specification (`SPECIFICATION.md`)](SPECIFICATION.md)
   - [Developer & AI Agent Guide (`AGENT.md`)](AGENT.md)
   - [5-Minute Quickstart Guide](docs/quickstart.md)

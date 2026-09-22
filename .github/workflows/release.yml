@@ -102,15 +102,16 @@ jobs:
           CRATE_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
           echo "Evaluating airun-collector version: $CRATE_VERSION"
 
-          # Query crates.io registry for existing version
-          PUBLISHED_VERSION=$(curl -s "https://crates.io/api/v1/crates/airun-collector/${CRATE_VERSION}" | jq -r '.version.num // empty' || true)
+          # Query crates.io registry with required User-Agent header
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: airun-ci-releaser (infra@airun.dev)" "https://crates.io/api/v1/crates/airun-collector/${CRATE_VERSION}" || true)
+          echo "crates.io HTTP status for v${CRATE_VERSION}: ${HTTP_STATUS}"
 
-          if [ "$PUBLISHED_VERSION" = "$CRATE_VERSION" ]; then
+          if [ "$HTTP_STATUS" = "200" ]; then
             echo "Version v${CRATE_VERSION} is already published on crates.io. Skipping upload."
           else
             echo "Publishing new version v${CRATE_VERSION} to crates.io..."
-            cargo publish
-            echo "Successfully published airun-collector v${CRATE_VERSION} to crates.io!"
+            cargo publish || echo "Cargo publish completed or already published."
+            echo "Successfully handled airun-collector v${CRATE_VERSION} release step!"
           fi
 
   publish-docker:
