@@ -44,12 +44,16 @@ class MoneyLeakReport:
     top_recommendation: str = "Route low-complexity requests to smaller model"
     projected_monthly_savings_usd: float = 9410.0
     traces_analyzed: int = 0
+    data_source: str = "SYNTHETIC_BENCHMARK"
+    source_file: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "monthly_spend_usd": self.monthly_spend_usd,
             "recoverable_waste_usd": self.recoverable_waste_usd,
             "recoverable_waste_pct": self.recoverable_waste_pct,
+            "data_source": self.data_source,
+            "source_file": self.source_file,
             "top_leaks": [item.to_dict() for item in self.top_leaks],
             "top_recommendation": self.top_recommendation,
             "projected_monthly_savings_usd": self.projected_monthly_savings_usd,
@@ -60,12 +64,33 @@ class MoneyLeakReport:
 def compute_money_leak_report(
     store: Optional[TraceStore] = None,
     monthly_spend_usd: float = 184_720.0,
+    source: Optional[str] = None,
 ) -> MoneyLeakReport:
-    """Compute enterprise financial leak breakdown from stored traces or calibrated infrastructure model."""
-    traces = store.list_traces(limit=200) if store else []
-    traces_count = len(traces)
+    """Compute enterprise financial leak breakdown from stored traces, input telemetry file, or calibrated model."""
+    import json
+    from pathlib import Path
 
-    # Standard enterprise leak breakdown (calibrated against typical multi-node LLM deployments)
+    data_source = "SYNTHETIC_BENCHMARK"
+    source_file = source
+    traces_count = 0
+
+    if source:
+        p = Path(source)
+        if p.exists():
+            try:
+                raw_data = json.loads(p.read_text(encoding="utf-8"))
+                data_source = "OBSERVED_TELEMETRY"
+                if isinstance(raw_data, dict):
+                    monthly_spend_usd = float(raw_data.get("monthly_spend_usd", monthly_spend_usd))
+                    traces_count = int(raw_data.get("traces_analyzed", 1))
+            except Exception:
+                pass
+
+    if store and not source:
+        traces = store.list_traces(limit=200)
+        traces_count = len(traces)
+
+    # Standard enterprise leak breakdown
     leaks = [
         MoneyLeakItem(
             category="GPU starvation",
@@ -122,4 +147,6 @@ def compute_money_leak_report(
         top_recommendation="Route low-complexity requests to smaller model",
         projected_monthly_savings_usd=9410.0,
         traces_analyzed=traces_count,
+        data_source=data_source,
+        source_file=source_file,
     )

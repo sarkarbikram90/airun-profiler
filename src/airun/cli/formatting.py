@@ -1040,6 +1040,15 @@ def render_money_leak_panel(report: Any) -> Panel:
     """Render the iconic AIRUN MONEY LEAK panel."""
     lines: list[str] = []
 
+    # Data Source Credibility Indicator
+    source_type = getattr(report, "data_source", "SYNTHETIC_BENCHMARK")
+    if source_type == "OBSERVED_TELEMETRY":
+        source_label = getattr(report, "source_file", None) or "Observed Telemetry"
+        lines.append(f"[bold green]Data Source: OBSERVED TELEMETRY ({source_label})[/bold green]")
+    else:
+        lines.append("[dim yellow]Data Source: SYNTHETIC CALIBRATED BENCHMARK (pass --source for observed)[/dim yellow]")
+    lines.append("")
+
     lines.append(f"Monthly AI Infrastructure Spend   [bold]${report.monthly_spend_usd:,.0f}[/bold]")
     lines.append(
         f"Recoverable Waste                 [bold red]${report.recoverable_waste_usd:,.0f}[/bold red] [bold yellow]({report.recoverable_waste_pct:.1f}%)[/bold yellow]"

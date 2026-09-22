@@ -597,6 +597,9 @@ def money_leak(
     spend: float = typer.Option(
         184_720.0, "--spend", "-s", help="Monthly AI infrastructure spend baseline in USD."
     ),
+    source: Optional[str] = typer.Option(
+        None, "--source", "-i", help="Path to observed telemetry or trace JSON file."
+    ),
     export: Optional[str] = typer.Option(
         None,
         "--export",
@@ -607,7 +610,7 @@ def money_leak(
 ) -> None:
     """Detect enterprise recoverable AI infrastructure waste across GPU starvation, models, and cache."""
     store = get_trace_store()
-    report = compute_money_leak_report(store=store, monthly_spend_usd=spend)
+    report = compute_money_leak_report(store=store, monthly_spend_usd=spend, source=source)
 
     if json_output:
         console.print(json.dumps(report.to_dict(), indent=2))

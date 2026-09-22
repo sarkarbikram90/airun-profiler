@@ -42,6 +42,18 @@ class GPUEfficiencyScore:
         else:
             return "CRITICAL_WASTE"
 
+    deductions: float = 0.0
+
+    @property
+    def formula_breakdown(self) -> str:
+        """Mathematical attribution of the 0-100 score."""
+        sm = self.subscores.get("sm_utilization_pct", 0.0)
+        mem = self.subscores.get("memory_bandwidth_pct", 0.0)
+        mfu = self.subscores.get("mfu_pct", 0.0)
+        bus = self.subscores.get("pcie_utilization_pct", 0.0)
+        ded = f" - Deductions({self.deductions:.0f})" if self.deductions > 0 else ""
+        return f"0.35*SM({sm:.0f}%) + 0.30*MemBW({mem:.0f}%) + 0.20*MFU({mfu:.0f}%) + 0.15*Bus({bus:.0f}%){ded} = {self.score}/100"
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "score": self.score,
@@ -52,7 +64,9 @@ class GPUEfficiencyScore:
             "potential_throughput_gain_pct": self.potential_throughput_gain_pct,
             "cost_savings_per_1k_tokens_usd": self.cost_savings_per_1k_tokens_usd,
             "ascii_bar": self.ascii_bar,
+            "formula_breakdown": self.formula_breakdown,
             "subscores": self.subscores,
+            "deductions": self.deductions,
             "recommendations": self.recommendations,
         }
 
@@ -156,5 +170,6 @@ def calculate_gpu_efficiency_score(
             "pcie_utilization_pct": round(pcie_util_pct, 1),
             "nccl_stall_ms": round(nccl_stall_ms, 1),
         },
+        deductions=deductions,
         recommendations=recommendations,
     )
