@@ -125,7 +125,9 @@ class TimeWindowCorrelator:
 
         window_samples = [s for s in telemetry if start_t <= s.timestamp <= end_t]
         if not window_samples:
-            window_samples = telemetry[:1] if telemetry else [PhysicalTelemetrySample(timestamp=start_t)]
+            window_samples = (
+                telemetry[:1] if telemetry else [PhysicalTelemetrySample(timestamp=start_t)]
+            )
 
         avg_sm = sum(s.sm_util_pct for s in window_samples) / len(window_samples)
         max_pcie = max(s.pcie_tx_mbs for s in window_samples)
@@ -150,9 +152,11 @@ class TimeWindowCorrelator:
         """Diagnose an entire trace and correlate against physical hardware bleed."""
         hourly_rate = self.profile.typical_hourly_cost_usd
         total_hourly_rate = hourly_rate * self.num_gpus
-        total_fabric_drops = sum(f.packet_drops for f in fabric_telemetry) if fabric_telemetry else 0
+        total_fabric_drops = (
+            sum(f.packet_drops for f in fabric_telemetry) if fabric_telemetry else 0
+        )
         total_pfc_rx = sum(f.pfc_pause_rx for f in fabric_telemetry) if fabric_telemetry else 0
-        fabric_congested = (total_pfc_rx > 10 or total_fabric_drops > 5)
+        fabric_congested = total_pfc_rx > 10 or total_fabric_drops > 5
 
         # Find spans with large duration or high cost
         spans_summary = []
@@ -160,13 +164,15 @@ class TimeWindowCorrelator:
             dur = s.duration_ms or 0.0
             tokens = (s.tokens_input or 0) + (s.tokens_output or 0)
             cost = s.cost_usd or 0.0
-            spans_summary.append({
-                "span_id": s.span_id,
-                "name": s.name,
-                "duration_ms": round(dur, 2),
-                "cost_usd": cost,
-                "tokens": tokens,
-            })
+            spans_summary.append(
+                {
+                    "span_id": s.span_id,
+                    "name": s.name,
+                    "duration_ms": round(dur, 2),
+                    "cost_usd": cost,
+                    "tokens": tokens,
+                }
+            )
 
         # Sort spans by duration to find potential stalls
         spans_summary.sort(key=lambda x: x["duration_ms"], reverse=True)
@@ -203,7 +209,9 @@ class TimeWindowCorrelator:
                 primary = "Dataloader Starvation (CPU/IO Bound)"
                 symptom = f"GPU SM active cycles dropped to {avg_sm:.1f}% (idle stalls) while PCIe TX was idle ({max_pcie:.0f} MB/s)"
                 root_cause = "Host CPU data loading workers starved accelerator between training mini-batches"
-                action = "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
+                action = (
+                    "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
+                )
                 waste_pct = round(max(0.10, (55.0 - avg_sm) / 100.0), 2)
                 expected_impact = {
                     "throughput_gain": "+31%",
@@ -241,8 +249,12 @@ class TimeWindowCorrelator:
             elif category == "framework_overhead":
                 primary = "Framework Eager Overhead (Software Bound)"
                 symptom = f"High host Python CPU overhead ({avg_cpu:.1f}%) creating idle kernel dispatch bubbles"
-                root_cause = "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
-                action = "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
+                root_cause = (
+                    "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
+                )
+                action = (
+                    "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
+                )
                 waste_pct = 0.20
                 expected_impact = {
                     "kernel_efficiency": "+35%",
@@ -252,8 +264,12 @@ class TimeWindowCorrelator:
             else:
                 primary = "Optimal Silicon Utilization (Healthy)"
                 symptom = f"GPU SM active cycles healthy ({avg_sm:.1f}%), PCIe TX/RX within normal operating limits ({max_pcie:.0f} MB/s)"
-                root_cause = "No hardware or network stalls detected across measured telemetry window"
-                action = "Maintain current batching, memory pinning, and network fabric configuration"
+                root_cause = (
+                    "No hardware or network stalls detected across measured telemetry window"
+                )
+                action = (
+                    "Maintain current batching, memory pinning, and network fabric configuration"
+                )
                 waste_pct = 0.0
                 expected_impact = {
                     "efficiency": "Optimal",
@@ -279,7 +295,9 @@ class TimeWindowCorrelator:
                 primary = "Dataloader Starvation (CPU/IO Bound)"
                 symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] GPU SM active cycles estimated at ~38.2% (idle stalls) while PCIe TX was idle (<400 MB/s)"
                 root_cause = "Host CPU data loading workers starved accelerator between training mini-batches"
-                action = "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
+                action = (
+                    "Increase DataLoader num_workers=8, set pin_memory=True, and pre-fetch tensors"
+                )
                 waste_pct = 0.34
                 expected_impact = {
                     "throughput_gain": "+31%",
@@ -292,7 +310,9 @@ class TimeWindowCorrelator:
             elif category == "nccl_overhead":
                 primary = "NCCL Synchronization Overhead (Network Bound)"
                 symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] GPU threads stalled in All-Reduce barrier (>35ms wait per step)"
-                root_cause = "Inter-node RoCE/InfiniBand network fabric bandwidth bottleneck or packet drops"
+                root_cause = (
+                    "Inter-node RoCE/InfiniBand network fabric bandwidth bottleneck or packet drops"
+                )
                 action = "Tune NCCL_BUFFSIZE=16MB and enable gradient accumulation to amortize synchronization"
                 waste_pct = 0.28
                 expected_impact = {
@@ -320,8 +340,12 @@ class TimeWindowCorrelator:
             else:
                 primary = "Framework Eager Overhead (Software Bound)"
                 symptom = "[ARCHITECTURAL ESTIMATE - NO DCGM TELEMETRY CONNECTED] High host Python CPU overhead (>80%) creating idle kernel dispatch bubbles"
-                root_cause = "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
-                action = "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
+                root_cause = (
+                    "PyTorch eager execution overhead on tiny sequential GPU kernel dispatches"
+                )
+                action = (
+                    "Compile model with torch.compile(mode='reduce-overhead') or enable CUDA Graphs"
+                )
                 waste_pct = 0.20
                 expected_impact = {
                     "kernel_efficiency": "+35%",

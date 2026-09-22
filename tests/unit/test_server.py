@@ -229,7 +229,3 @@ def test_server_demo_seeding_endpoint():
     assert output["status"] == "success"
     assert output["count"] == 4
     assert len(output["trace_ids"]) == 4
-
-
-
-

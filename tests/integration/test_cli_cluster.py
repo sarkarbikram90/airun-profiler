@@ -1,4 +1,4 @@
-﻿from typer.testing import CliRunner
+from typer.testing import CliRunner
 
 from airun.cli.main import app
 

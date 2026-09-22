@@ -118,8 +118,12 @@ def test_diagnose_trace_healthy_optimal() -> None:
     ]
     record = TraceRecord(trace_id="t_good", created_at="2026-09-07T00:00:00Z", spans=spans)
     samples = [
-        PhysicalTelemetrySample(timestamp=10.1, sm_util_pct=88.0, pcie_tx_mbs=2500.0, nccl_wait_ms=5.0),
-        PhysicalTelemetrySample(timestamp=10.3, sm_util_pct=92.0, pcie_tx_mbs=2800.0, nccl_wait_ms=6.0),
+        PhysicalTelemetrySample(
+            timestamp=10.1, sm_util_pct=88.0, pcie_tx_mbs=2500.0, nccl_wait_ms=5.0
+        ),
+        PhysicalTelemetrySample(
+            timestamp=10.3, sm_util_pct=92.0, pcie_tx_mbs=2800.0, nccl_wait_ms=6.0
+        ),
     ]
 
     diag = correlator.diagnose_trace(record, telemetry=samples)
@@ -145,8 +149,12 @@ def test_diagnose_trace_with_ebpf_fabric_telemetry() -> None:
     ]
     record = TraceRecord(trace_id="t_fabric", created_at="2026-09-07T00:00:00Z", spans=spans)
     telemetry = [
-        PhysicalTelemetrySample(timestamp=50.1, sm_util_pct=62.0, pcie_tx_mbs=1200.0, nccl_wait_ms=45.0),
-        PhysicalTelemetrySample(timestamp=50.4, sm_util_pct=58.0, pcie_tx_mbs=1100.0, nccl_wait_ms=52.0),
+        PhysicalTelemetrySample(
+            timestamp=50.1, sm_util_pct=62.0, pcie_tx_mbs=1200.0, nccl_wait_ms=45.0
+        ),
+        PhysicalTelemetrySample(
+            timestamp=50.4, sm_util_pct=58.0, pcie_tx_mbs=1100.0, nccl_wait_ms=52.0
+        ),
     ]
     fabric_samples = [
         FabricTelemetrySample(
@@ -165,4 +173,3 @@ def test_diagnose_trace_with_ebpf_fabric_telemetry() -> None:
     assert diag.fabric_drops_total == 25
     assert "eBPF detected 25 packet drops and 85 PFC pause frames" in diag.symptom
     assert "In-kernel eBPF confirmed network fabric buffer overflow" in diag.root_cause
-

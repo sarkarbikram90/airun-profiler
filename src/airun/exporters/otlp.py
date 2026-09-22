@@ -46,9 +46,7 @@ class OTLPSpanExporter:
 
     def __init__(self, endpoint: str | None = None, timeout: float = 2.0) -> None:
         self.endpoint = (
-            endpoint
-            or os.getenv("AIRUN_OTLP_ENDPOINT")
-            or "http://localhost:4318/v1/traces"
+            endpoint or os.getenv("AIRUN_OTLP_ENDPOINT") or "http://localhost:4318/v1/traces"
         )
         self.timeout = timeout
         self.is_enabled = bool(os.getenv("AIRUN_OTLP_ENDPOINT") or endpoint)
@@ -56,10 +54,19 @@ class OTLPSpanExporter:
     def span_to_otlp_dict(self, span: TraceSpan, trace_id: str) -> dict[str, Any]:
         """Convert an airun TraceSpan to standard OTLP JSON format."""
         start_ns = _parse_to_ns(span.start_time)
-        end_ns = _parse_to_ns(span.end_time) or (start_ns + int((span.duration_ms or 0.0) * 1_000_000))
+        end_ns = _parse_to_ns(span.end_time) or (
+            start_ns + int((span.duration_ms or 0.0) * 1_000_000)
+        )
 
         attributes = [
-            {"key": "span.kind", "value": {"stringValue": span.kind.value if hasattr(span.kind, "value") else str(span.kind)}},
+            {
+                "key": "span.kind",
+                "value": {
+                    "stringValue": span.kind.value
+                    if hasattr(span.kind, "value")
+                    else str(span.kind)
+                },
+            },
             {"key": "cost.usd", "value": {"doubleValue": span.cost_usd or 0.0}},
             {"key": "tokens.input", "value": {"intValue": span.tokens_input or 0}},
             {"key": "tokens.output", "value": {"intValue": span.tokens_output or 0}},
@@ -129,7 +136,9 @@ class OTLPSpanExporter:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return resp.status in (200, 202)
         except (urllib.error.URLError, TimeoutError, OSError) as e:
-            logger.debug("OTLP export to %s failed (collector likely offline): %s", self.endpoint, e)
+            logger.debug(
+                "OTLP export to %s failed (collector likely offline): %s", self.endpoint, e
+            )
             return False
 
     # Alias for API compatibility
@@ -201,11 +210,7 @@ def otlp_payload_to_trace_records(payload: dict[str, Any]) -> list[TraceRecord]:
                     or span_attrs.get("gen_ai.request.model")
                     or span_attrs.get("llm.model_name")
                 )
-                provider = (
-                    span_attrs.get("provider")
-                    or span_attrs.get("gen_ai.system")
-                    or "openai"
-                )
+                provider = span_attrs.get("provider") or span_attrs.get("gen_ai.system") or "openai"
                 tok_in = int(
                     span_attrs.get("tokens.input")
                     or span_attrs.get("gen_ai.usage.prompt_tokens")
@@ -272,7 +277,9 @@ def otlp_payload_to_trace_records(payload: dict[str, Any]) -> list[TraceRecord]:
         summary = TraceSummary(
             trace_id=t_id,
             name=workflow_name,
-            start_time=spans[0].start_time if spans else datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            start_time=spans[0].start_time
+            if spans
+            else datetime.datetime.now(datetime.timezone.utc).isoformat(),
             end_time=spans[-1].end_time if spans else None,
             total_duration_ms=round(total_duration, 2),
             total_tokens=total_tokens,
@@ -291,4 +298,3 @@ def otlp_payload_to_trace_records(payload: dict[str, Any]) -> list[TraceRecord]:
         )
 
     return records
-

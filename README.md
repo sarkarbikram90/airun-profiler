@@ -1,4 +1,4 @@
-# AI Infrastructure Reliability & Economics Platform (`airun`)
+# AI Infrastructure Performance Engineering & GPU FinOps (`airun`)
 
 <p align="center">
   <a href="https://github.com/sarkarbikram90/airun-profiler/actions/workflows/ci.yml"><img src="https://github.com/sarkarbikram90/airun-profiler/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -29,73 +29,137 @@
   <code>gpu-finops</code> • 
   <code>nvidia-dcgm</code> • 
   <code>h100-sxm5</code> • 
-  <code>mfu-profiler</code> • 
-  <code>opentelemetry</code> • 
+  <code>vllm-benchmarking</code> • 
+  <code>sglang</code> • 
+  <code>gpu-efficiency-score</code> • 
   <code>circuit-breakers</code> • 
-  <code>disaster-recovery</code> • 
-  <code>gke-daemonset</code> • 
-  <code>eks-daemonset</code> • 
-  <code>aks-daemonset</code>
+  <code>disaster-recovery</code>
 </p>
 
 ---
 
-### Stop Flying Blind on AI Infrastructure. Detect GPU Waste, Prevent Financial Bleed, and Enforce Model Reliability.
+> **The Core Wedge:** `airun` tells you why an AI workload is expensive or slow by connecting the logical AI trace to the physical silicon bottlenecks causing it.
+
+```text
+               +-------------------------------------------------------------+
+               |                  THE AIRUN 5-PILLAR ARCHITECTURE            |
+               +-------------------------------------------------------------+
+               |                                                             |
+   [ PROFILE ] |  Universal Tracing  *  NVIDIA DCGM Telemetry  *  Token DAG  |
+               |  Measure exact execution spans, SM cycles, PCIe & NVLink    |
+               +------------------------------+------------------------------+
+                                              |
+               +------------------------------v------------------------------+
+  [ DIAGNOSE ] |  Trace -> GPU -> Root Cause  *  GPU Efficiency Score (0-100)|
+               |  airun diagnose <trace-id> --accelerator h100               |
+               +------------------------------+------------------------------+
+                                              |
+               +------------------------------v------------------------------+
+ [ ECONOMICS ] |  Executive Money Leak Audit  *  Compute & Power Waste $/mo  |
+               |  airun money-leak --spend 184720 --export audit.html        |
+               +------------------------------+------------------------------+
+                                              |
+               +------------------------------v------------------------------+
+  [ OPTIMIZE ] |  Inference Benchmark (vLLM, SGLang, TRT-LLM) * Pareto Front |
+               |  airun bench --model qwen3-8b --gpu l4                      |
+               +------------------------------+------------------------------+
+                                              |
+               +------------------------------v------------------------------+
+    [ VERIFY ] |  Automated Remediation Policies  *  DR Fault Drills & Breaker|
+               |  airun policy check  *  airun dr drill                      |
+               +-------------------------------------------------------------+
+```
 
 | Question | Answer |
 | :--- | :--- |
-| **1. What is it?** | An open-source, local-first **AI Infrastructure Reliability & FinOps Platform** that bridges the gap between physical silicon telemetry (NVIDIA DCGM / NVLink / PCIe), LLM token economics, multi-agent execution graphs, and automated multi-provider failover. |
-| **2. Who is it for?** | **AI Engineers**, **MLOps / Platform Engineers**, and **Engineering Leaders (CTOs/CFOs)** building production LLM pipelines, autonomous multi-agent systems, or distributed GPU training/inference clusters. |
-| **3. Why does it exist?** | Traditional APMs (Datadog, New Relic) only see generic HTTP spans. They cannot correlate GPU streaming multiprocessor (SM) stalls or PCIe Gen1 throttling to wasted compute dollars, cannot compute Model FLOPs Utilization (MFU), cannot detect prompt context bloat, and cannot auto-switch across LLM providers when outages strike. |
+| **1. What is it?** | An open-source, local-first **AI Infrastructure Performance Engineering & GPU FinOps Platform** that bridges the gap between physical silicon telemetry (NVIDIA DCGM / NVLink / PCIe), LLM token economics, multi-agent execution graphs, and automated multi-provider failover. |
+| **2. Who is it for?** | **AI Engineers**, **MLOps / Platform Engineers**, and **Engineering Leaders (CTOs/CFOs)** operating production LLM pipelines, autonomous multi-agent systems, or distributed GPU training/inference clusters. |
+| **3. Why does it exist?** | Traditional APMs (Datadog, New Relic) only see generic HTTP spans. They cannot correlate GPU streaming multiprocessor (SM) stalls or PCIe Gen1 throttling to wasted compute dollars, cannot compute Model FLOPs Utilization (MFU), cannot detect prompt context bloat, and cannot benchmark serving engines. |
 | **4. How to install?** | `pip install airun-profiler` (Python SDK & CLI) <br> `cargo install airun-collector` (High-frequency Rust node telemetry daemon) |
-| **5. What does it catch?** | Run `airun waste` to diagnose physical silicon starvation ($/hr bleed) and `airun golden-signals` to inspect your 4-layer physical-to-economic health metrics immediately. |
+| **5. What does it catch?** | Run `airun diagnose` for instant Trace-to-GPU root cause analysis, `airun money-leak` to audit enterprise recoverable waste, and `airun bench` to benchmark vLLM vs SGLang. |
+
+### 1. Signature Command: `airun diagnose` (Trace -> GPU -> Root Cause)
 
 ```text
-$ airun waste latest --hardware
+$ airun diagnose demo --accelerator h100
 
-+--- ! HARDWARE WASTE DETECTED IN TRACE: 37a4d2533b5641618529039ee12456c6 ----+
-| Workload          research_agent_workflow (8x H100 SXM5)                    |
-| Telemetry Source  NVIDIA DCGM Real-Time Ingestion (Rust Collector)          |
-| Bottleneck        Dataloader Starvation (CPU/IO Bound)                      |
-| Symptom           GPU SM active cycles stalled at ~38.2% (idle wait)        |
-|                   while PCIe TX bus was idle (<400 MB/s)                    |
-| Financial Bleed   $1,599.36 / week ($9.52/hr | $6,854.40/mo)                |
-| Root Cause        Host CPU data loading workers starved accelerator between |
-|                   inference/training mini-batches                           |
-| Actionable Fix    Increase DataLoader num_workers=8, set pin_memory=True,   |
-|                   and pre-fetch input tensors                               |
-| Expected Impact   throughput_gain: +31%, waste_reduction: -82%,             |
-|                   weekly_cost_savings: $1,279.49                            |
-+-----------------------------------------------------------------------------+
-
-$ airun golden-signals latest
-
-+---------------- AI Infrastructure Golden Signals Hierarchy -----------------+
-|       1. Economics (CFO View)           2. Efficiency (ML Engineer View)    |
-| +----------------------------------+  +-----------------------------------+ |
-| | Signal          | Value          |  | Signal             | Value        | |
-| |-----------------+----------------|  |--------------------+--------------| |
-| | Cost / Eff      | $87.33         |  | Model FLOPs Util   | 62.0%        | |
-| | GPU-Hour        |                |  | (MFU)              |              | |
-| | Cost / 1M       | $1.5647        |  | Achieved           | 250.0 TFLOPS | |
-| | Tokens          |                |  | Throughput         |              | |
-| | Financial Bleed | $0.38/hr       |  | GPU SM Utilization | 78.0%        | |
-| | Wasted Spend    | $0.0018 (20.8%)|  | Memory Bandwidth   | 64.0%        | |
-| +----------------------------------+  +-----------------------------------+ |
-|                                                                             |
-|    3. Reliability (Platform View)      4. Infrastructure (Physical Layer)   |
-| +----------------------------------+  +-----------------------------------+ |
-| | Signal            | Value        |  | Signal          | Value           | |
-| |-------------------+--------------|  |-----------------+-----------------| |
-| | Job Failure Rate  | 0.0%         |  | Active Power    | 274 W (PUE      | |
-| | Mean Recovery     | 0ms          |  | Draw            | 1.20)           | |
-| | Time              |              |  | Thermal         | No Throttling   | |
-| | Step Retries      | 1            |  | Throttling      |                 | |
-| | Checkpoint        | Every 15 min |  | PCIe Bus Errors | 0               | |
-| | Cadence           |              |  | Network Retrans | 2.00%           | |
-| +----------------------------------+  +-----------------------------------+ |
-+-----------------------------------------------------------------------------+
++--------------------------- AIRUN DIAGNOSTIC ---------------------------+
+| Workflow: research_agent_workflow                                      |
+| Duration: 0.28s                                                        |
+| Cost: $0.0081                                                          |
+| GPU: H100 SXM                                                          |
+| GPU utilization: 32%                                                   |
+| SM active: 29%                                                         |
+| PCIe RX: 1.1 GB/s                                                      |
+| CPU utilization: 55%                                                   |
+| GPU Efficiency: [#####---------------] 24/100                          |
+|                                                                        |
+| ROOT CAUSE ----------------------------------------                    |
+| Host DataLoader starvation (CPU/IO Bound)                              |
+|                                                                        |
+| EVIDENCE ------------------------------------------                    |
+| * GPU SM active cycles stalled at 29.0% (idle wait)                    |
+| * PCIe Host-to-Device RX bus at 1.1 GB/s (<5% bus capacity)            |
+| * CPU worker threads saturated at 55.0% during mini-batch dispatch     |
+|                                                                        |
+| FINANCIAL IMPACT ----------------------------------                    |
+| Current cost:    $0.0081/request                                       |
+| Estimated waste: $0.0034/request (42.0%)                               |
+| Monthly waste:   $1,700.00                                             |
+|                                                                        |
+| RECOMMENDATION ------------------------------------                    |
+| [OK] Increase DataLoader workers, set pin_memory=True, prefetch tensors|
+| [OK] Pin CPU worker threads to local NUMA node sockets                 |
+|                                                                        |
+| EXPECTED RESULT -----------------------------------                    |
+| Gpu Utilization    32% -> ~74%                                         |
+| Cost Per Request   -42%                                                |
+| Throughput         +51%                                                |
++------------------------------------------------------------------------+
 ```
+
+### 2. Signature Command: `airun money-leak` (Executive Financial Bleed Audit)
+
+```text
+$ airun money-leak --spend 184720 --export report.html
+
++------------------ AIRUN MONEY LEAK ------------------+
+| Monthly AI Infrastructure Spend   $184,720           |
+| Recoverable Waste                 $41,932 (22.7%)    |
+|                                                      |
+| TOP LEAKS ------------------------------------------ |
+| $14,820  GPU starvation                              |
+| $ 9,410  oversized model selection                   |
+| $ 6,280  redundant agent/tool calls                  |
+| $ 5,731  KV-cache misses                             |
+| $ 3,921  retry amplification                         |
+| $ 1,770  idle GPU capacity                           |
+|                                                      |
+| TOP RECOMMENDATION --------------------------------- |
+| Route low-complexity requests to smaller model       |
+| Projected savings: $9,410/month                      |
++------------------------------------------------------+
+
+[+] Executive Money Leak report saved to report.html
+```
+
+### 3. Signature Command: `airun bench` (Inference Engine Showdown)
+
+```text
+$ airun bench --model qwen3-8b --gpu l4
+
+            AIRUN BENCHMARK: QWEN3-8B (L4)
++-----------------+-----------+-----------+
+| Metric          |      vLLM |    SGLang |
++-----------------+-----------+-----------+
+| TTFT p50        |    71.2ms |    83.1ms |
+| TTFT p99        |   184.5ms |   211.2ms |
+| TPOT (Decode)   |    31.4ms |    27.1ms |
+| Throughput      | 812 tok/s | 901 tok/s |
+| GPU util        |     78.2% |     84.0% |
+| $/1M tokens     |     $2.71 |     $2.44 |
+| Energy / token  |   0.18 mJ |   0.16 mJ |
++-----------------+-----------+-----------+
 
 ---
 
@@ -408,6 +472,27 @@ Output:
   - **Multi-Cluster Cross-Cloud Federation (`airun cluster [list|overview|recommend]`)**: Global GPU capacity aggregation and intelligent MFU-per-dollar placement across GCP GKE, AWS EKS, Azure AKS, and on-premise DGX SuperPODs.
   - **Live Silicon CI Hardware Testing**: Dedicated physical GPU test suite (`tests/hardware/test_silicon_hardware.py`), Kubernetes GPU runner manifest (`deploy/ci/gpu-runner.yaml`), and GitHub Actions workflow (`.github/workflows/gpu-hardware-ci.yml`).
   $$\text{Observe} \longrightarrow \text{Understand} \longrightarrow \text{Measure Economics} \longrightarrow \text{Find Waste} \longrightarrow \text{Recommend Optimization} \longrightarrow \text{Remediate} \longrightarrow \text{Learn}$$
+
+---
+
+## CLI Command Reference (5-Pillar Mental Model)
+
+| Pillar | Command | Description |
+| :--- | :--- | :--- |
+| **PROFILE** | `airun demo` | Run zero-friction simulated agent trace offline |
+| | `airun report <id>` | Generate executive execution summary and flamegraph tree |
+| | `airun golden-signals <id>` | Inspect 4-layer physical-to-economic health metrics |
+| **DIAGNOSE** | `airun diagnose <id>` | Connect logical trace to physical silicon bottlenecks & root cause |
+| | `airun agent analyze <id>` | Detect duplicate retrievals, loop redundancy, and tool chain stalls |
+| | `airun waste <id>` | Diagnose silicon starvation and compute dollar bleed |
+| **ECONOMICS** | `airun money-leak` | Executive audit of enterprise recoverable AI infrastructure waste |
+| | `airun metrics <id>` | Measure Intelligence per Dollar (IPD) and IPW |
+| **OPTIMIZE** | `airun bench` | Benchmark inference engines (vLLM, SGLang, TensorRT-LLM) |
+| | `airun frontier` | Plot Pareto-optimal models across Quality, Cost, and Latency |
+| | `airun compare <id1> <id2>` | Deep comparative delta between two workflow traces |
+| **VERIFY** | `airun breaker status` | Real-time state of multi-provider circuit breakers |
+| | `airun dr drill` | Automated disaster recovery fault injection simulation |
+| | `airun policy evaluate` | Evaluate closed-loop automated remediation policies |
 
 ---
 

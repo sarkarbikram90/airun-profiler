@@ -142,13 +142,21 @@ class DistributedPipelineEngine:
         total_cost = summary.total_cost_usd if summary else 0.0
         wasted_cost = summary.wasted_cost_usd if summary else 0.0
         mfu = summary.mfu_pct if (summary and summary.mfu_pct is not None) else 48.5
-        tflops = summary.achieved_tflops if (summary and summary.achieved_tflops is not None) else 480.0
+        tflops = (
+            summary.achieved_tflops if (summary and summary.achieved_tflops is not None) else 480.0
+        )
         hourly_bleed = (
             summary.hourly_bleed_usd
             if (summary and summary.hourly_bleed_usd is not None)
-            else (round(optimization_payload.potential_monthly_savings_usd / 720.0, 2) if optimization_payload else 16.95)
+            else (
+                round(optimization_payload.potential_monthly_savings_usd / 720.0, 2)
+                if optimization_payload
+                else 16.95
+            )
         )
-        category = optimization_payload.category if optimization_payload else "dataloader_starvation"
+        category = (
+            optimization_payload.category if optimization_payload else "dataloader_starvation"
+        )
 
         run_record = {
             "table": "runs",

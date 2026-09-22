@@ -709,7 +709,10 @@ def render_hardware_bleed_panel(diagnosis: Any) -> Panel:
     table.add_column("Field", style="bold white")
     table.add_column("Details", style="cyan")
 
-    table.add_row("Workload", f"{diagnosis.workload_name} ({diagnosis.num_gpus}x {diagnosis.accelerator.upper()})")
+    table.add_row(
+        "Workload",
+        f"{diagnosis.workload_name} ({diagnosis.num_gpus}x {diagnosis.accelerator.upper()})",
+    )
     source_tag = (
         "[bold green][MEASURED HARDWARE][/bold green]"
         if not getattr(diagnosis, "is_estimated", True)
@@ -801,7 +804,11 @@ def render_workload_waste_panel(
     impact_table.add_column("Projected Change", style="bold cyan")
 
     for k, v in impact.items():
-        color = "green" if v.startswith("-") and "Cost" in k or "Latency" in k else ("yellow" if "Quality" in k else "cyan")
+        color = (
+            "green"
+            if v.startswith("-") and "Cost" in k or "Latency" in k
+            else ("yellow" if "Quality" in k else "cyan")
+        )
         impact_table.add_row(k, f"[{color}]{v}[/{color}]")
 
     grid = Table.grid(padding=(1, 0))
@@ -918,7 +925,10 @@ def render_federation_overview_panel(overview: dict) -> Panel:
     grid.add_column("Metric", style="bold white")
     grid.add_column("Value", style="cyan")
 
-    grid.add_row("Total Federated Clusters", str(overview.get("total_clusters", overview.get("totalClusters", 0))))
+    grid.add_row(
+        "Total Federated Clusters",
+        str(overview.get("total_clusters", overview.get("totalClusters", 0))),
+    )
     grid.add_row(
         "Global GPU Footprint",
         f"{overview.get('active_gpus', overview.get('activeGpus', 0))} active / {overview.get('total_gpus', overview.get('totalGpus', 0))} provisioned GPUs",
@@ -942,7 +952,9 @@ def render_federation_overview_panel(overview: dict) -> Panel:
         f"GCP: {prov.get('gcp', 0)} | AWS: {prov.get('aws', 0)} | Azure: {prov.get('azure', 0)} | On-Prem: {prov.get('onPrem', prov.get('on_prem', 0))}",
     )
 
-    opt = overview.get("optimal_cluster_for_workload", overview.get("optimalClusterForWorkload", {}))
+    opt = overview.get(
+        "optimal_cluster_for_workload", overview.get("optimalClusterForWorkload", {})
+    )
     if opt:
         grid.add_row(
             "Optimal Placement",
@@ -957,3 +969,176 @@ def render_federation_overview_panel(overview: dict) -> Panel:
     )
 
 
+def render_signature_diagnostic_card(diagnostic: Any) -> Panel:
+    """Render the signature AIRUN DIAGNOSTIC card."""
+    lines: list[str] = []
+
+    # Header metadata
+    lines.append(
+        f"[bold white]Workflow:[/bold white] [bold cyan]{diagnostic.workflow_name}[/bold cyan]"
+    )
+    lines.append(f"[bold white]Duration:[/bold white] {diagnostic.duration_sec:.2f}s")
+    lines.append(
+        f"[bold white]Cost:[/bold white] [bold green]${diagnostic.cost_per_request_usd:.4f}[/bold green]"
+    )
+    lines.append(f"[bold white]GPU:[/bold white] {diagnostic.accelerator}")
+    lines.append(f"[bold white]GPU utilization:[/bold white] {diagnostic.gpu_utilization_pct:.0f}%")
+    lines.append(
+        f"[bold white]SM active:[/bold white] [yellow]{diagnostic.sm_active_pct:.0f}%[/yellow]"
+    )
+    lines.append(f"[bold white]PCIe RX:[/bold white] {diagnostic.pcie_rx_gbs:.1f} GB/s")
+    lines.append(
+        f"[bold white]CPU utilization:[/bold white] [bold red]{diagnostic.cpu_utilization_pct:.0f}%[/bold red]"
+    )
+
+    gpu_eff = getattr(diagnostic, "gpu_efficiency", None)
+    if gpu_eff:
+        lines.append(
+            f"[bold white]GPU Efficiency:[/bold white] [bold green]{gpu_eff.ascii_bar}[/bold green]"
+        )
+
+    lines.append("")
+    lines.append("[bold cyan]ROOT CAUSE ----------------------------------------[/bold cyan]")
+    lines.append(f"[bold red]{diagnostic.root_cause}[/bold red]")
+
+    lines.append("")
+    lines.append("[bold cyan]EVIDENCE ------------------------------------------[/bold cyan]")
+    for ev in diagnostic.evidence:
+        lines.append(f"* {ev}")
+
+    lines.append("")
+    lines.append("[bold cyan]FINANCIAL IMPACT ----------------------------------[/bold cyan]")
+    lines.append(
+        f"Current cost:    [bold]${diagnostic.current_cost_per_request_usd:.4f}/request[/bold]"
+    )
+    lines.append(
+        f"Estimated waste: [bold red]${diagnostic.estimated_waste_per_request_usd:.4f}/request[/bold red] ({diagnostic.waste_percentage:.1f}%)"
+    )
+    lines.append(f"Monthly waste:   [bold red]${diagnostic.monthly_waste_usd:,.2f}[/bold red]")
+
+    lines.append("")
+    lines.append("[bold cyan]RECOMMENDATION ------------------------------------[/bold cyan]")
+    for rec in diagnostic.recommendations:
+        lines.append(f"[bold green][OK] {rec}[/bold green]")
+
+    lines.append("")
+    lines.append("[bold cyan]EXPECTED RESULT -----------------------------------[/bold cyan]")
+    for k, v in diagnostic.expected_result.items():
+        k_fmt = k.replace("_", " ").title()
+        lines.append(f"{k_fmt:<18} [bold green]{v}[/bold green]")
+
+    content = "\n".join(lines)
+    return Panel(
+        content,
+        title="[bold yellow]AIRUN DIAGNOSTIC[/bold yellow]",
+        border_style="bright_blue",
+        expand=False,
+    )
+
+
+def render_money_leak_panel(report: Any) -> Panel:
+    """Render the iconic AIRUN MONEY LEAK panel."""
+    lines: list[str] = []
+
+    lines.append(f"Monthly AI Infrastructure Spend   [bold]${report.monthly_spend_usd:,.0f}[/bold]")
+    lines.append(
+        f"Recoverable Waste                 [bold red]${report.recoverable_waste_usd:,.0f}[/bold red] [bold yellow]({report.recoverable_waste_pct:.1f}%)[/bold yellow]"
+    )
+    lines.append("")
+    lines.append("[bold cyan]TOP LEAKS ------------------------------------------[/bold cyan]")
+
+    for item in report.top_leaks:
+        lines.append(f"[bold red]${item.amount_usd:>6,.0f}[/bold red]  {item.category}")
+
+    lines.append("")
+    lines.append("[bold cyan]TOP RECOMMENDATION ----------------------------------[/bold cyan]")
+    lines.append(f"[bold green]{report.top_recommendation}[/bold green]")
+    lines.append(
+        f"Projected savings: [bold green]${report.projected_monthly_savings_usd:,.0f}/month[/bold green]"
+    )
+
+    content = "\n".join(lines)
+    return Panel(
+        content,
+        title="[bold red]AIRUN MONEY LEAK[/bold red]",
+        border_style="red",
+        expand=False,
+    )
+
+
+def render_agent_efficiency_panel(report: Any) -> Panel:
+    """Render AGENT EFFICIENCY REPORT panel."""
+    lines: list[str] = []
+
+    lines.append(
+        f"[bold red]{report.redundant_cost_pct:.1f}%[/bold red] of execution cost is attributable to redundant work ([bold red]${report.redundant_cost_usd:.4f}[/bold red])."
+    )
+    if report.potential_latency_savings_sec > 0:
+        lines.append(
+            f"Potential critical-path latency savings: [bold green]{report.potential_latency_savings_sec:.2f}s[/bold green]"
+        )
+
+    lines.append("")
+    lines.append("[bold cyan]Top findings:[/bold cyan]")
+    for idx, f in enumerate(report.findings, start=1):
+        lines.append(f"[bold white]{idx}. {f.title}:[/bold white] {f.description}")
+        if f.remediation:
+            lines.append(f"   [dim green]-> Fix: {f.remediation}[/dim green]")
+
+    if getattr(report, "mcp_servers", None):
+        lines.append("")
+        lines.append("[bold cyan]MCP Server Observability:[/bold cyan]")
+        for m in report.mcp_servers:
+            waste_tag = (
+                f" [bold red](${m.estimated_waste_usd:.4f} waste)[/bold red]"
+                if m.estimated_waste_usd > 0
+                else ""
+            )
+            lines.append(
+                f"* [bold]{m.server_name}[/bold]: {m.total_calls} calls, {m.duplicate_calls} duplicates, {m.total_latency_ms:.0f}ms{waste_tag}"
+            )
+
+    content = "\n".join(lines)
+    return Panel(
+        content,
+        title="[bold cyan]AGENT EFFICIENCY REPORT[/bold cyan]",
+        border_style="bright_blue",
+        expand=False,
+    )
+
+
+def render_inference_benchmark_table(suite: Any) -> Table:
+    """Render comparative inference engine benchmark table."""
+    table = Table(
+        title=f"[bold cyan]AIRUN BENCHMARK: {suite.model.upper()} ({suite.gpu.upper()})[/bold cyan]",
+        border_style="bright_blue",
+    )
+    table.add_column("Metric", style="bold white")
+
+    engines = list(suite.results_by_engine.keys())
+    for e in engines:
+        style = "bold green" if e == suite.winner_throughput else "cyan"
+        table.add_column(e, justify="right", style=style)
+
+    table.add_row("TTFT p50", *(f"{suite.results_by_engine[e].ttft_p50_ms:.1f}ms" for e in engines))
+    table.add_row("TTFT p99", *(f"{suite.results_by_engine[e].ttft_p99_ms:.1f}ms" for e in engines))
+    table.add_row(
+        "TPOT (Decode)", *(f"{suite.results_by_engine[e].tpot_ms:.1f}ms" for e in engines)
+    )
+    table.add_row(
+        "Throughput",
+        *(f"{suite.results_by_engine[e].throughput_tokens_sec:.0f} tok/s" for e in engines),
+    )
+    table.add_row(
+        "GPU util", *(f"{suite.results_by_engine[e].gpu_utilization_pct:.1f}%" for e in engines)
+    )
+    table.add_row(
+        "$/1M tokens",
+        *(f"${suite.results_by_engine[e].cost_per_1m_tokens_usd:.2f}" for e in engines),
+    )
+    table.add_row(
+        "Energy / token",
+        *(f"{suite.results_by_engine[e].energy_per_token_mj:.2f} mJ" for e in engines),
+    )
+
+    return table

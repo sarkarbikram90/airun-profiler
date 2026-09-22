@@ -38,7 +38,9 @@ def test_cli_waste_hardware() -> None:
     record = TraceRecord(trace_id="trace-hw-test", created_at="2026-09-07T00:00:00Z", spans=spans)
     store.save_trace(record)
 
-    result = runner.invoke(app, ["waste", "trace-hw-test", "--hardware", "--accelerator", "h100", "--gpus", "8"])
+    result = runner.invoke(
+        app, ["waste", "trace-hw-test", "--hardware", "--accelerator", "h100", "--gpus", "8"]
+    )
     assert result.exit_code == 0
     assert "HARDWARE WASTE DETECTED IN TRACE" in result.stdout
     assert "Financial Bleed" in result.stdout

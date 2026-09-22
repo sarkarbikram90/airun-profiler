@@ -65,12 +65,20 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
     node_id = f"gke-node-{accelerator}-01"
 
     console.print()
-    console.print("[bold cyan]================================================================================[/bold cyan]")
+    console.print(
+        "[bold cyan]================================================================================[/bold cyan]"
+    )
     console.print("  [bold white]airun: End-to-End Distributed Pipeline Execution[/bold white]")
-    console.print("[bold cyan]================================================================================[/bold cyan]")
+    console.print(
+        "[bold cyan]================================================================================[/bold cyan]"
+    )
     console.print("  [dim]Topology Architecture:[/dim]")
-    console.print("  [bold green]Python Workload[/bold green] -> [bold yellow]Rust Collector[/bold yellow] -> [bold magenta]Pub/Sub[/bold magenta] -> [bold green]Python Analytics[/bold green] -> [bold blue]PostgreSQL[/bold blue] -> [bold cyan]TypeScript API[/bold cyan]")
-    console.print("[bold cyan]================================================================================[/bold cyan]\n")
+    console.print(
+        "  [bold green]Python Workload[/bold green] -> [bold yellow]Rust Collector[/bold yellow] -> [bold magenta]Pub/Sub[/bold magenta] -> [bold green]Python Analytics[/bold green] -> [bold blue]PostgreSQL[/bold blue] -> [bold cyan]TypeScript API[/bold cyan]"
+    )
+    console.print(
+        "[bold cyan]================================================================================[/bold cyan]\n"
+    )
 
     event_bus = PubSubEventBus()
     store = get_trace_store()
@@ -96,7 +104,9 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
         payload=start_payload,
     )
     await event_bus.publish(start_evt)
-    console.print(f"  * Emitted -> Pub/Sub: [cyan]'{start_evt.event_type.value}'[/cyan] (ID: {start_evt.event_id})")
+    console.print(
+        f"  * Emitted -> Pub/Sub: [cyan]'{start_evt.event_type.value}'[/cyan] (ID: {start_evt.event_id})"
+    )
 
     # Generate synthetic spans simulating agent execution
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -167,7 +177,9 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
     ]
     console.print(f"  * Node: [bold]{node_id}[/bold] (8x {accelerator.upper()})")
     console.print("  * DCGM In-Memory Ring Buffer: 1,000 samples @ 10Hz")
-    console.print("  * Telemetry Scraped: [yellow]SM Active=38.2% (Idle stalls), PCIe TX=380 MB/s, CPU=98.5%[/yellow]")
+    console.print(
+        "  * Telemetry Scraped: [yellow]SM Active=38.2% (Idle stalls), PCIe TX=380 MB/s, CPU=98.5%[/yellow]"
+    )
 
     gpu_alert = GpuAlertPayload(
         node_id=node_id,
@@ -188,7 +200,9 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
         payload=gpu_alert,
     )
     await event_bus.publish(alert_evt)
-    console.print(f"  * Emitted -> Pub/Sub: [yellow]'{alert_evt.event_type.value}'[/yellow] (Bleed: $16.95/hr)")
+    console.print(
+        f"  * Emitted -> Pub/Sub: [yellow]'{alert_evt.event_type.value}'[/yellow] (Bleed: $16.95/hr)"
+    )
 
     # --------------------------------------------------------------------------
     # Step 3: Pub/Sub Event Backbone & Route
@@ -207,7 +221,9 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
         payload=trace_payload,
     )
     await event_bus.publish(trace_evt)
-    console.print(f"  * Routing [bold]{len(event_bus.history)} events[/bold] across Pub/Sub topic [magenta]'projects/airun-production/topics/ai-infrastructure-events'[/magenta]")
+    console.print(
+        f"  * Routing [bold]{len(event_bus.history)} events[/bold] across Pub/Sub topic [magenta]'projects/airun-production/topics/ai-infrastructure-events'[/magenta]"
+    )
 
     # --------------------------------------------------------------------------
     # Step 4: Python Intelligence Plane Analytics
@@ -215,15 +231,25 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
     console.print("\n[bold green]Step 4: Python Intelligence Plane Analytics Consumer[/bold green]")
     # Process the trace.created event through pipeline
     await pipeline_engine.handle_trace_created(trace_evt)
-    console.print("  * Time-Window Correlator: Matched 3 logical spans to microsecond GPU physical window")
-    console.print("  * Waste Detector Diagnosis: [bold red]Dataloader Starvation (CPU/IO Bound)[/bold red]")
-    console.print("  * Projected Financial Bleed: [bold red]$1,599.36 / week ($9.52/hr | $6,854.40/mo)[/bold red]")
-    console.print("  * Emitted -> Pub/Sub: [green]'optimization.detected'[/green] (Savings: $1,279.49/wk)")
+    console.print(
+        "  * Time-Window Correlator: Matched 3 logical spans to microsecond GPU physical window"
+    )
+    console.print(
+        "  * Waste Detector Diagnosis: [bold red]Dataloader Starvation (CPU/IO Bound)[/bold red]"
+    )
+    console.print(
+        "  * Projected Financial Bleed: [bold red]$1,599.36 / week ($9.52/hr | $6,854.40/mo)[/bold red]"
+    )
+    console.print(
+        "  * Emitted -> Pub/Sub: [green]'optimization.detected'[/green] (Savings: $1,279.49/wk)"
+    )
 
     # --------------------------------------------------------------------------
     # Step 5: PostgreSQL System of Record Persistence
     # --------------------------------------------------------------------------
-    console.print("\n[bold blue]Step 5: PostgreSQL System of Record (State & Decisions)[/bold blue]")
+    console.print(
+        "\n[bold blue]Step 5: PostgreSQL System of Record (State & Decisions)[/bold blue]"
+    )
     trace_summary = TraceSummary(
         trace_id=trace_id,
         name=workload,
@@ -244,14 +270,22 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
         spans=spans,
     )
     _ = pipeline_engine.generate_postgres_records(workload, trace_record)
-    console.print(f"  * Inserted into [blue]'runs'[/blue]: trace_id={trace_id}, duration=334.7ms, mfu=48.5%")
-    console.print(f"  * Inserted into [blue]'cost_records'[/blue]: accelerator={accelerator.upper()}, bleed=$16.95/hr")
-    console.print("  * Inserted into [blue]'recommendations'[/blue]: category=dataloader_starvation, status=open")
+    console.print(
+        f"  * Inserted into [blue]'runs'[/blue]: trace_id={trace_id}, duration=334.7ms, mfu=48.5%"
+    )
+    console.print(
+        f"  * Inserted into [blue]'cost_records'[/blue]: accelerator={accelerator.upper()}, bleed=$16.95/hr"
+    )
+    console.print(
+        "  * Inserted into [blue]'recommendations'[/blue]: category=dataloader_starvation, status=open"
+    )
 
     # --------------------------------------------------------------------------
     # Step 6: TypeScript Control Plane API Verification
     # --------------------------------------------------------------------------
-    console.print("\n[bold cyan]Step 6: TypeScript Control Plane API & Commercial Wedge[/bold cyan]")
+    console.print(
+        "\n[bold cyan]Step 6: TypeScript Control Plane API & Commercial Wedge[/bold cyan]"
+    )
     console.print(f"  * Querying: [cyan]GET /api/v1/workloads/{workload}/cost-reliability[/cyan]")
 
     # Commercial wedge summary table
@@ -274,7 +308,15 @@ async def _execute_pipeline(workload: str, accelerator: str, cluster: str) -> No
 
     console.print(table)
 
-    console.print("\n[bold green]================================================================================[/bold green]")
-    console.print("  [bold white][SUCCESS] Complete Distributed Pipeline Verified Across All 6 Tiers![/bold white]")
-    console.print("  [dim]Python Workload -> Rust Collector -> Pub/Sub -> Python Analytics -> PostgreSQL -> TypeScript API[/dim]")
-    console.print("[bold green]================================================================================[/bold green]\n")
+    console.print(
+        "\n[bold green]================================================================================[/bold green]"
+    )
+    console.print(
+        "  [bold white][SUCCESS] Complete Distributed Pipeline Verified Across All 6 Tiers![/bold white]"
+    )
+    console.print(
+        "  [dim]Python Workload -> Rust Collector -> Pub/Sub -> Python Analytics -> PostgreSQL -> TypeScript API[/dim]"
+    )
+    console.print(
+        "[bold green]================================================================================[/bold green]\n"
+    )

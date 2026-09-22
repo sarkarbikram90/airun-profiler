@@ -124,4 +124,3 @@ def test_otlp_payload_to_trace_records_roundtrip() -> None:
     assert span.duration_ms == 250.0
     assert rec.summary is not None
     assert rec.summary.total_cost_usd == 0.00725
-

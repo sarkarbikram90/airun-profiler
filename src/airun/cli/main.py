@@ -18,12 +18,17 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from airun.analysis.agent_efficiency import analyze_agent_efficiency
 from airun.analysis.analyzer import analyze_spans
 from airun.analysis.comparator import compare_traces
 from airun.analysis.correlation import TimeWindowCorrelator
+from airun.analysis.diagnose import run_trace_diagnostic
+from airun.analysis.money_leak import compute_money_leak_report
 from airun.analysis.waste import detect_compute_waste
+from airun.benchmarks.inference import run_inference_benchmark
 from airun.cli.formatting import (
     build_rich_tree,
+    render_agent_efficiency_panel,
     render_breaker_status_table,
     render_comparison_panel,
     render_cost_drivers_table,
@@ -35,9 +40,12 @@ from airun.cli.formatting import (
     render_findings_panel,
     render_golden_signals_panel,
     render_hardware_bleed_panel,
+    render_inference_benchmark_table,
+    render_money_leak_panel,
     render_profiler_summary_panel,
     render_remediation_results_panel,
     render_remediation_rules_table,
+    render_signature_diagnostic_card,
     render_trace_summary_panel,
     render_traces_list_table,
     render_waste_analysis_panel,
@@ -45,6 +53,7 @@ from airun.cli.formatting import (
 )
 from airun.cli.pipeline import pipeline_app
 from airun.events.models import SpanKind, SpanStatus
+from airun.exporters.html_report import generate_diagnostic_html, generate_money_leak_html
 from airun.exporters.json_export import export_trace_to_json
 from airun.exporters.otel_export import export_trace_to_otel
 from airun.graph.builder import ExecutionGraph
@@ -61,7 +70,7 @@ from airun.utils.time_utils import format_cost, format_duration, perf_counter_ms
 
 app = typer.Typer(
     name="airun",
-    help="AI Infrastructure Reliability & Economics Platform: Measure compute, power, IPD, IPW, and multi-provider resilience.",
+    help="AI Infrastructure Performance Engineering & GPU FinOps: Connect AI traces to physical silicon and compute economics.",
     no_args_is_help=True,
 )
 trace_app = typer.Typer(help="Manage and inspect captured execution traces.")
@@ -70,6 +79,7 @@ breaker_app = typer.Typer(help="Inspect and manage the AI Breaker Box.")
 profiler_app = typer.Typer(help="Open-source process profiler and GTM waste hook.")
 policy_app = typer.Typer(help="Manage and evaluate automated closed-loop remediation policies.")
 cluster_app = typer.Typer(help="Inspect and manage multi-cluster cross-cloud federation.")
+agent_app = typer.Typer(help="Analyze agent workflows, loop redundancy, and MCP tool efficiency.")
 
 app.add_typer(trace_app, name="trace")
 app.add_typer(dr_app, name="dr")
@@ -78,19 +88,40 @@ app.add_typer(profiler_app, name="profiler")
 app.add_typer(pipeline_app, name="pipeline")
 app.add_typer(policy_app, name="policy")
 app.add_typer(cluster_app, name="cluster")
+app.add_typer(agent_app, name="agent")
 
 
 console = Console()
 
 
+def _seed_demo_trace() -> str:
+    """Seed a fast local demo trace if database is empty."""
+    with trace("research_agent_workflow", kind=SpanKind.WORKFLOW) as root_span:
+        with trace("agent_planning", kind=SpanKind.AGENT_STEP):
+            with trace("planner_llm_call", kind=SpanKind.LLM, model="gpt-4o", provider="openai"):
+                set_span_tokens(input_tokens=1420, output_tokens=380)
+        with trace("tool_execution_phase", kind=SpanKind.AGENT_STEP):
+            with trace("web_search_tool", kind=SpanKind.TOOL, provider="search_engine"):
+                record_retry()
+                set_span_metadata({"query": "AI Runtime Tracing Architecture", "results_count": 5})
+            with trace("vector_db_query", kind=SpanKind.DB, provider="chromadb"):
+                set_span_metadata({"collection": "agent_memory", "k": 4})
+        with trace("summarization_step", kind=SpanKind.AGENT_STEP):
+            with trace(
+                "summarizer_llm_call", kind=SpanKind.LLM, model="gpt-4o-mini", provider="openai"
+            ):
+                set_span_tokens(input_tokens=2850, output_tokens=520)
+    return root_span.trace_id
+
+
 def _resolve_trace_id(identifier: str, store: TraceStore) -> str:
-    """Resolve aliases like 'latest' or 'previous' to concrete trace IDs."""
+    """Resolve aliases like 'latest', 'previous', or 'demo' to concrete trace IDs."""
     id_lower = identifier.lower().strip()
     if id_lower in ("latest", "last"):
         recent = store.list_traces(limit=1)
         if not recent:
-            console.print("[bold red]No stored traces found in database.[/bold red]")
-            raise typer.Exit(code=1)
+            _seed_demo_trace()
+            recent = store.list_traces(limit=1)
         return recent[0].trace_id
     elif id_lower in ("previous", "prev"):
         recent = store.list_traces(limit=2)
@@ -100,6 +131,12 @@ def _resolve_trace_id(identifier: str, store: TraceStore) -> str:
             )
             raise typer.Exit(code=1)
         return recent[1].trace_id
+    elif id_lower in ("demo", "sample", "example"):
+        recent = store.list_traces(limit=1)
+        if not recent:
+            _seed_demo_trace()
+            recent = store.list_traces(limit=1)
+        return recent[0].trace_id
     return identifier
 
 
@@ -502,6 +539,165 @@ def frontier() -> None:
     console.print("\n", render_efficient_frontier_table(models), "\n")
 
 
+@app.command("diagnose")
+def diagnose(
+    trace_id: str = typer.Argument("latest", help="Trace ID to diagnose (or 'latest')."),
+    accelerator: str = typer.Option(
+        "h100", "--accelerator", "-a", help="Target accelerator (h100, a100, l4, b200)."
+    ),
+    gpus: int = typer.Option(
+        8, "--gpus", "-g", help="Number of GPUs allocated to workload node pool."
+    ),
+    monthly_requests: int = typer.Option(
+        500_000,
+        "--monthly-requests",
+        "-m",
+        help="Monthly request volume for financial bleed projection.",
+    ),
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        "-e",
+        help="Export path for standalone HTML diagnostic report (e.g., diagnostic.html).",
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output results in JSON format."),
+) -> None:
+    """Trace -> GPU -> Root Cause: Connect logical AI trace to physical silicon bottlenecks and financial impact."""
+    store = get_trace_store()
+    resolved_id = _resolve_trace_id(trace_id, store)
+    record = store.get_trace(resolved_id)
+
+    if not record:
+        console.print(f"[bold red]Trace '{trace_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    diagnostic = run_trace_diagnostic(
+        record=record,
+        accelerator=accelerator,
+        num_gpus=gpus,
+        monthly_requests=monthly_requests,
+    )
+
+    if json_output:
+        console.print(json.dumps(diagnostic.to_dict(), indent=2))
+        return
+
+    console.print("\n", render_signature_diagnostic_card(diagnostic), "\n")
+
+    if export:
+        p = Path(export)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        html = generate_diagnostic_html(diagnostic)
+        p.write_text(html, encoding="utf-8")
+        console.print(f"[bold green][+] Standalone diagnostic report saved to {p}[/bold green]\n")
+
+
+@app.command("money-leak")
+def money_leak(
+    spend: float = typer.Option(
+        184_720.0, "--spend", "-s", help="Monthly AI infrastructure spend baseline in USD."
+    ),
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        "-e",
+        help="Export path for standalone HTML executive audit report (e.g., report.html).",
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output results in JSON format."),
+) -> None:
+    """Detect enterprise recoverable AI infrastructure waste across GPU starvation, models, and cache."""
+    store = get_trace_store()
+    report = compute_money_leak_report(store=store, monthly_spend_usd=spend)
+
+    if json_output:
+        console.print(json.dumps(report.to_dict(), indent=2))
+        return
+
+    console.print("\n", render_money_leak_panel(report), "\n")
+
+    if export:
+        p = Path(export)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        html = generate_money_leak_html(report)
+        p.write_text(html, encoding="utf-8")
+        console.print(f"[bold green][+] Executive Money Leak report saved to {p}[/bold green]\n")
+
+
+@app.command("bench")
+def bench(
+    model: str = typer.Option("qwen3-8b", "--model", "-m", help="Target LLM model under test."),
+    engines: str = typer.Option(
+        "vllm,sglang",
+        "--engines",
+        help="Comma-separated serving engines to benchmark (e.g. vllm,sglang,tensorrt-llm).",
+    ),
+    gpu: str = typer.Option("l4", "--gpu", "-g", help="Target GPU accelerator under test."),
+    concurrency: str = typer.Option(
+        "1,8,32,64", "--concurrency", "-c", help="Concurrency steps to test."
+    ),
+    export: Optional[str] = typer.Option(
+        None, "--export", "-e", help="Export path for Markdown or HTML benchmark report."
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output results in JSON format."),
+) -> None:
+    """Benchmark inference engines (vLLM, SGLang, TensorRT-LLM) across TTFT, TPOT, throughput, and $/1M tokens."""
+    engine_list = [e.strip() for e in engines.split(",") if e.strip()]
+    concurrency_list = [int(c.strip()) for c in concurrency.split(",") if c.strip()]
+
+    suite = run_inference_benchmark(
+        model=model,
+        engines=engine_list,
+        gpu=gpu,
+        concurrency=concurrency_list,
+    )
+
+    if json_output:
+        console.print(json.dumps(suite.to_dict(), indent=2))
+        return
+
+    console.print("\n", render_inference_benchmark_table(suite), "\n")
+
+    if export:
+        p = Path(export)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(suite.to_markdown(), encoding="utf-8")
+        console.print(f"[bold green][+] Benchmark report saved to {p}[/bold green]\n")
+
+
+@agent_app.command("analyze")
+def agent_analyze(
+    trace_id: str = typer.Argument(
+        "latest", help="Trace ID to analyze for agent inefficiencies (or 'latest')."
+    ),
+    export: Optional[str] = typer.Option(
+        None, "--export", "-e", help="Export path for JSON audit report."
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output results in JSON format."),
+) -> None:
+    """Analyze agent execution DAG for duplicate retrievals, model escalation, serial tool loops, and context bloat."""
+    store = get_trace_store()
+    resolved_id = _resolve_trace_id(trace_id, store)
+    record = store.get_trace(resolved_id)
+
+    if not record:
+        console.print(f"[bold red]Trace '{trace_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    report = analyze_agent_efficiency(record)
+
+    if json_output:
+        console.print(json.dumps(report.to_dict(), indent=2))
+        return
+
+    console.print("\n", render_agent_efficiency_panel(report), "\n")
+
+    if export:
+        p = Path(export)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+        console.print(f"[bold green][+] Agent efficiency report saved to {p}[/bold green]\n")
+
+
 @dr_app.command("drill")
 def execute_dr_drill(
     primary: str = typer.Option(
@@ -545,7 +741,9 @@ def policy_list() -> None:
 
 @policy_app.command("evaluate")
 def policy_evaluate(
-    trace_id: str = typer.Argument("latest", help="Trace ID to evaluate against policies (or 'latest')."),
+    trace_id: str = typer.Argument(
+        "latest", help="Trace ID to evaluate against policies (or 'latest')."
+    ),
     accelerator: str = typer.Option(
         "h100", "--accelerator", "-a", help="Target accelerator for physical hardware diagnosis."
     ),
@@ -666,12 +864,16 @@ def _fetch_federation_overview(endpoint: str | None = None) -> dict:
     total_gpus = sum(c.get("total_gpus", c.get("totalGpus", 0)) for c in clusters)
     active_gpus = sum(c.get("active_gpus", c.get("activeGpus", 0)) for c in clusters)
     spend = sum(
-        c.get("active_gpus", c.get("activeGpus", 0)) * c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 0.0))
+        c.get("active_gpus", c.get("activeGpus", 0))
+        * c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 0.0))
         for c in clusters
     )
-    bleed = sum(c.get("average_bleed_hourly_usd", c.get("averageBleedHourlyUsd", 0.0)) for c in clusters)
+    bleed = sum(
+        c.get("average_bleed_hourly_usd", c.get("averageBleedHourlyUsd", 0.0)) for c in clusters
+    )
     avg_mfu = (
-        sum(c.get("average_mfu_pct", c.get("averageMfuPct", 0.0)) for c in clusters) / total_clusters
+        sum(c.get("average_mfu_pct", c.get("averageMfuPct", 0.0)) for c in clusters)
+        / total_clusters
         if total_clusters > 0
         else 0.0
     )
@@ -705,13 +907,22 @@ def _fetch_federation_overview(endpoint: str | None = None) -> dict:
 @cluster_app.command("list")
 def cluster_list(
     endpoint: Optional[str] = typer.Option(
-        None, "--endpoint", "-e", help="Control plane URL (default: AIRUN_CONTROL_PLANE_URL or http://localhost:3000)."
+        None,
+        "--endpoint",
+        "-e",
+        help="Control plane URL (default: AIRUN_CONTROL_PLANE_URL or http://localhost:3000).",
     ),
     provider: Optional[str] = typer.Option(
-        None, "--provider", "-p", help="Filter clusters by cloud provider (e.g., gcp, aws, azure, on-prem)."
+        None,
+        "--provider",
+        "-p",
+        help="Filter clusters by cloud provider (e.g., gcp, aws, azure, on-prem).",
     ),
     accelerator: Optional[str] = typer.Option(
-        None, "--accelerator", "-a", help="Filter clusters by accelerator type (e.g., h100, a100, b200)."
+        None,
+        "--accelerator",
+        "-a",
+        help="Filter clusters by accelerator type (e.g., h100, a100, b200).",
     ),
 ) -> None:
     """List all federated GPU clusters across hybrid multi-cloud environments."""
@@ -722,7 +933,8 @@ def cluster_list(
         clusters = [
             c
             for c in clusters
-            if c.get("accelerator_type", c.get("acceleratorType", "")).lower() == accelerator.lower()
+            if c.get("accelerator_type", c.get("acceleratorType", "")).lower()
+            == accelerator.lower()
         ]
 
     console.print("\n", render_federated_clusters_table(clusters), "\n")
@@ -731,7 +943,10 @@ def cluster_list(
 @cluster_app.command("overview")
 def cluster_overview(
     endpoint: Optional[str] = typer.Option(
-        None, "--endpoint", "-e", help="Control plane URL (default: AIRUN_CONTROL_PLANE_URL or http://localhost:3000)."
+        None,
+        "--endpoint",
+        "-e",
+        help="Control plane URL (default: AIRUN_CONTROL_PLANE_URL or http://localhost:3000).",
     ),
 ) -> None:
     """Display global multi-cloud capacity, utilization, and aggregate financial bleed."""
@@ -741,13 +956,17 @@ def cluster_overview(
 
 @cluster_app.command("recommend")
 def cluster_recommend(
-    workload: str = typer.Argument(..., help="Workload identifier or model name (e.g., llama3-70b-train)."),
-    gpus: int = typer.Option(8, "--gpus", "-g", help="Required number of GPUs for the workload."),
-    accelerator: str = typer.Option("h100", "--accelerator", "-a", help="Preferred GPU accelerator type."),
-    max_rate: Optional[float] = typer.Option(None, "--max-rate", help="Maximum acceptable hourly rate per GPU."),
-    endpoint: Optional[str] = typer.Option(
-        None, "--endpoint", "-e", help="Control plane URL."
+    workload: str = typer.Argument(
+        ..., help="Workload identifier or model name (e.g., llama3-70b-train)."
     ),
+    gpus: int = typer.Option(8, "--gpus", "-g", help="Required number of GPUs for the workload."),
+    accelerator: str = typer.Option(
+        "h100", "--accelerator", "-a", help="Preferred GPU accelerator type."
+    ),
+    max_rate: Optional[float] = typer.Option(
+        None, "--max-rate", help="Maximum acceptable hourly rate per GPU."
+    ),
+    endpoint: Optional[str] = typer.Option(None, "--endpoint", "-e", help="Control plane URL."),
 ) -> None:
     """Recommend the optimal multi-cloud cluster for placement based on MFU-per-dollar efficiency."""
     ep = endpoint or os.getenv("AIRUN_CONTROL_PLANE_URL", "http://localhost:3000")
@@ -778,22 +997,33 @@ def cluster_recommend(
         matching = [
             c
             for c in clusters
-            if c.get("accelerator_type", c.get("acceleratorType", "")).lower() == accelerator.lower()
-            and (c.get("total_gpus", c.get("totalGpus", 0)) - c.get("active_gpus", c.get("activeGpus", 0))) >= gpus
-            and (max_rate is None or c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 0.0)) <= max_rate)
+            if c.get("accelerator_type", c.get("acceleratorType", "")).lower()
+            == accelerator.lower()
+            and (
+                c.get("total_gpus", c.get("totalGpus", 0))
+                - c.get("active_gpus", c.get("activeGpus", 0))
+            )
+            >= gpus
+            and (
+                max_rate is None
+                or c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 0.0)) <= max_rate
+            )
         ]
         if not matching:
             matching = [
                 c
                 for c in clusters
-                if c.get("accelerator_type", c.get("acceleratorType", "")).lower() == accelerator.lower()
+                if c.get("accelerator_type", c.get("acceleratorType", "")).lower()
+                == accelerator.lower()
             ]
 
         if matching:
             best = max(
                 matching,
-                key=lambda c: (c.get("average_mfu_pct", c.get("averageMfuPct", 0.0)))
-                / max(0.1, c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 1.0))),
+                key=lambda c: (
+                    (c.get("average_mfu_pct", c.get("averageMfuPct", 0.0)))
+                    / max(0.1, c.get("hourly_rate_per_gpu", c.get("hourlyRatePerGpu", 1.0)))
+                ),
             )
             placement = {
                 "workloadId": workload,
@@ -802,7 +1032,8 @@ def cluster_recommend(
                 "region": best.get("region"),
                 "acceleratorType": best.get("accelerator_type", best.get("acceleratorType")),
                 "hourlyRatePerGpu": best.get("hourly_rate_per_gpu", best.get("hourlyRatePerGpu")),
-                "expectedHourlyCostUsd": gpus * best.get("hourly_rate_per_gpu", best.get("hourlyRatePerGpu", 0.0)),
+                "expectedHourlyCostUsd": gpus
+                * best.get("hourly_rate_per_gpu", best.get("hourlyRatePerGpu", 0.0)),
                 "expectedMfuPct": best.get("average_mfu_pct", best.get("averageMfuPct")),
                 "efficiencyScore": round(
                     best.get("average_mfu_pct", best.get("averageMfuPct", 0.0))
@@ -820,13 +1051,26 @@ def cluster_recommend(
     rec_table.add_column("Key", style="bold white")
     rec_table.add_column("Value", style="cyan")
     rec_table.add_row("Workload ID", placement.get("workloadId", workload))
-    rec_table.add_row("Recommended Cluster", f"[bold green]{placement.get('recommendedClusterId')}[/bold green]")
-    rec_table.add_row("Provider / Region", f"{placement.get('provider', '').upper()} ({placement.get('region')})")
-    rec_table.add_row("Accelerator", f"{gpus}x {placement.get('acceleratorType', accelerator).upper()}")
+    rec_table.add_row(
+        "Recommended Cluster", f"[bold green]{placement.get('recommendedClusterId')}[/bold green]"
+    )
+    rec_table.add_row(
+        "Provider / Region", f"{placement.get('provider', '').upper()} ({placement.get('region')})"
+    )
+    rec_table.add_row(
+        "Accelerator", f"{gpus}x {placement.get('acceleratorType', accelerator).upper()}"
+    )
     rec_table.add_row("Hourly Rate / GPU", f"${placement.get('hourlyRatePerGpu', 0.0):.2f}")
-    rec_table.add_row("Estimated Total Spend", f"[bold green]${placement.get('expectedHourlyCostUsd', 0.0):.2f}/hr[/bold green]")
-    rec_table.add_row("Expected MFU", f"[bold green]{placement.get('expectedMfuPct', 0.0):.1f}%[/bold green]")
-    rec_table.add_row("MFU/Dollar Score", f"[bold yellow]{placement.get('efficiencyScore', 0.0)}[/bold yellow]")
+    rec_table.add_row(
+        "Estimated Total Spend",
+        f"[bold green]${placement.get('expectedHourlyCostUsd', 0.0):.2f}/hr[/bold green]",
+    )
+    rec_table.add_row(
+        "Expected MFU", f"[bold green]{placement.get('expectedMfuPct', 0.0):.1f}%[/bold green]"
+    )
+    rec_table.add_row(
+        "MFU/Dollar Score", f"[bold yellow]{placement.get('efficiencyScore', 0.0)}[/bold yellow]"
+    )
     rec_table.add_row("Reason", str(placement.get("reason")))
 
     console.print(
