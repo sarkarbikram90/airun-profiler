@@ -88,7 +88,7 @@ def seed_demo_traces() -> list[str]:
 class AirunServerHandler(BaseHTTPRequestHandler):
     """HTTP Request Handler providing REST API and single-page executive web UI."""
 
-    server_version = "airun-server/0.1.4"
+    server_version = "airun-server/0.1.7"
 
     def _send_json(self, data: Any, status: int = 200):
         """Helper to send JSON response."""
@@ -230,7 +230,7 @@ class AirunServerHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "status": "ok",
-                    "version": "0.1.4",
+                    "version": "0.1.7",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             )

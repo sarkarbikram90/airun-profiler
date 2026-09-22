@@ -28,7 +28,7 @@ app.get('/healthz', async (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: '@airun/control-plane',
-    version: '0.1.4',
+    version: '0.1.7',
     timestamp: new Date().toISOString(),
     database: dbHealth,
   });

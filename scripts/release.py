@@ -120,14 +120,7 @@ def bump_versions(version: str) -> None:
         f'tag: "{version}"',
     )
 
-    # 10. README.md badge
-    update_file(
-        ROOT / "README.md",
-        r'badge/version-[^-\s]+-blue\.svg',
-        f'badge/version-{version}-blue.svg',
-    )
-
-    # 11. AGENT.md
+    # 10. AGENT.md
     update_file(
         ROOT / "AGENT.md",
         r'- \*\*v[^\s]+ \(Current\)\*\*',
@@ -153,6 +146,12 @@ def main() -> None:
     print("============================================================")
 
     bump_versions(version)
+
+    print("\n>> Cleaning prior build artifacts...")
+    dist_dir = ROOT / "dist"
+    if dist_dir.exists():
+        import shutil
+        shutil.rmtree(dist_dir)
 
     print("\n>> Verifying test suite and package builds...")
     run_cmd([sys.executable, "-m", "pytest"])
