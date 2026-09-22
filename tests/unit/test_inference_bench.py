@@ -54,3 +54,60 @@ def test_inference_benchmark_markdown_and_dict():
     assert "results" in d
     assert "winner_throughput" in d
     assert "winner_cost" in d
+    assert "vLLM" in d["results"]
+    assert "ttft_p95_ms" in d["results"]["vLLM"]
+    assert "sample_count" in d["results"]["vLLM"]
+
+
+def test_run_benchmark_from_config_file(tmp_path):
+    from airun.benchmarks.inference import run_benchmark_from_config
+
+    config_yaml = """
+schema_version: "1.0"
+benchmark_name: "test-serving-suite"
+environment:
+  accelerator: "l4"
+workload:
+  model: "qwen3-8b"
+  concurrency_levels: [1, 8]
+engines:
+  - name: "vllm"
+  - name: "sglang"
+gate_thresholds:
+  max_ttft_p95_ms: 180.0
+  min_throughput_tokens_sec: 800.0
+"""
+    cfg_file = tmp_path / "bench.yaml"
+    cfg_file.write_text(config_yaml, encoding="utf-8")
+
+    suite = run_benchmark_from_config(cfg_file)
+    assert suite.benchmark_name == "test-serving-suite"
+    assert suite.overall_gate_status == "PASS"
+    assert suite.results_by_engine["vLLM"].gate_status == "PASS"
+    assert suite.results_by_engine["SGLang"].gate_status == "PASS"
+
+
+def test_run_benchmark_from_config_gate_failure(tmp_path):
+    from airun.benchmarks.inference import run_benchmark_from_config
+
+    config_yaml = """
+schema_version: "1.0"
+benchmark_name: "strict-gate-suite"
+environment:
+  accelerator: "l4"
+workload:
+  model: "qwen3-8b"
+engines:
+  - name: "sglang"
+gate_thresholds:
+  max_ttft_p95_ms: 150.0  # SGLang p95 is ~172.4ms, must fail
+"""
+    cfg_file = tmp_path / "strict.yaml"
+    cfg_file.write_text(config_yaml, encoding="utf-8")
+
+    suite = run_benchmark_from_config(cfg_file)
+    assert suite.overall_gate_status == "FAIL"
+    sglang = suite.results_by_engine["SGLang"]
+    assert sglang.gate_status == "FAIL"
+    assert any("150.0ms" in f for f in sglang.gate_failures)
+

@@ -44,28 +44,62 @@ The score classifies workloads across four operational tiers:
 - **SUBOPTIMAL (50–69)**: Detectable bottlenecks present. Batch size, KV-cache, or data loader tuning required.
 - **CRITICAL WASTE (<50)**: Severe silicon starvation. Over 50% of hourly GPU spend is unproductively wasted.
 
-### Workload Diagnostic Signatures
+### The 6 Canonical Workload Signatures
 
 ```text
-1. DataLoader Starvation (CPU/IO Bound)
-   SM Active: 28%  |  Mem BW: 25%  |  PCIe RX: 1.2 GB/s  |  Score: 24/100 (CRITICAL_WASTE)
-   Root Cause: Host CPU workers cannot load and preprocess mini-batches fast enough.
-   Remedy: Increase DataLoader num_workers=8, set pin_memory=True, prefetch tensors.
+1. Compute-Bound Dense GEMM (Training / Chunked Prefill)
+   SM Active: 95%  |  Mem BW: 92%  |  MFU: 80%  |  PCIe RX: 70%  |  Score: 87/100 (EXCELLENT)
+   Root Cause: Compute and memory subsystems saturated in tandem.
+   Remedy: Hardware operating within optimal efficiency envelope.
 
-2. Memory Bandwidth Bound (LLM Decode)
-   SM Active: 45%  |  Mem BW: 88%  |  PCIe RX: 12.4 GB/s |  Score: 68/100 (SUBOPTIMAL)
-   Root Cause: Autoregressive decoding waiting on weight memory transfer from HBM.
-   Remedy: Implement continuous batching, weight quantization (FP8), or FlashAttention-3.
+2. Memory Bandwidth Bound (LLM Autoregressive Decode)
+   SM Active: 52%  |  Mem BW: 88%  |  MFU: 30%  |  PCIe RX: 35%  |  Score: 68/100 (SUBOPTIMAL)
+   Root Cause: Memory wall bottleneck—token generation awaits weight matrix transfers from HBM.
+   Remedy: Implement continuous/chunked prefill, weight quantization (FP8/INT4), FlashAttention-3.
 
-3. Distributed NCCL Stall
-   SM Active: 38%  |  Mem BW: 34%  |  NCCL Barrier: 420ms |  Score: 32/100 (CRITICAL_WASTE)
-   Root Cause: Network fabric congestion (PFC pause frame storm or straggler node).
-   Remedy: Check InfiniBand/RoCE MTU, disable PCIe power management, isolate straggler GPU.
+3. Distributed NCCL Stall (Multi-Node / Multi-GPU Synchronous Barriers)
+   SM Active: 38%  |  Mem BW: 32%  |  MFU: 25%  |  NCCL Barrier: 50ms |  Score: 32/100 (CRITICAL_WASTE)
+   Root Cause: Inter-node fabric jitter, PFC pause storms, or straggler GPU node.
+   Remedy: Tune NCCL_BUFFSIZE=16MB, check InfiniBand/RoCE MTU and PCIe Gen5 link health.
+
+4. Host DataLoader Starvation (CPU/IO Bound Mini-batch pipeline)
+   SM Active: 24%  |  Mem BW: 20%  |  MFU: 15%  |  PCIe RX: 10%  |  Score: 21/100 (CRITICAL_WASTE)
+   Root Cause: Host CPU workers cannot load, decode, and transform tensors fast enough.
+   Remedy: Increase DataLoader num_workers=8+, set pin_memory=True, prefetch tensors.
+
+5. Mixed Inference Serving (Balanced Dynamic Continuous Batching)
+   SM Active: 80%  |  Mem BW: 80%  |  MFU: 60%  |  PCIe RX: 50%  |  Score: 74/100 (GOOD)
+   Root Cause: Well-balanced interleaved prefill and decode execution.
+   Remedy: Maintain continuous batching schedule and monitor p99 TTFT.
+
+6. Idle / Severely Starved Accelerator
+   SM Active: 2%   |  Mem BW: 3%   |  MFU: 1%   |  PCIe RX: 1%   |  Score: 5/100 (CRITICAL_WASTE)
+   Root Cause: GPU unallocated or blocked waiting indefinitely on upstream pipeline.
+   Remedy: Deprovision or scale down idle compute capacity; check cluster scheduler queue.
 ```
 
 ---
 
-## 4. Defensible Transparency in `airun`
+## 4. Empirical Sensitivity Curves & Partial Derivatives
+
+The sensitivity of the GPU Efficiency Score to individual metric variations demonstrates strict piecewise linearity bounded by physical anomaly thresholds:
+
+| Metric Dimension | Partial Derivative $\frac{\partial \text{Score}}{\partial X}$ | Sensitivity Interpretation | Dynamic Range |
+| :--- | :---: | :--- | :--- |
+| **SM Active ($U_{\text{SM}}$)** | **+0.35** | Every +10% increase in SM active cycles yields +3.5 points. | 0% to 100% |
+| **Memory Bandwidth ($U_{\text{BW}}$)** | **+0.30** | Every +10% increase in HBM controller saturation yields +3.0 points. | 0% to 100% |
+| **Model FLOPs Util ($\text{MFU}$)** | **+0.20** | Every +10% increase in MFU yields +2.0 points. | 0% to 100% |
+| **Host Bus Util ($U_{\text{Bus}}$)** | **+0.15** | Every +10% increase in PCIe bus utilization yields +1.5 points. | 0% to 100% |
+
+### Anomaly Step-Function Penalties
+
+- **Thermal Throttling ($\Delta = -15.0$)**: Triggers immediately upon clock degradation.
+- **PCIe Bus Errors ($\Delta = -\min(15, 3 \times \text{errors})$)**: Quantifies replay penalty.
+- **NCCL Stalls ($\Delta = -\min(15, 0.5 \times (\text{stall\_ms} - 20))$)**: Penalizes barriers exceeding 20ms.
+
+Empirical verification suite: `tests/unit/test_gpu_score_sensitivity.py` (11 tests validating linear response, edge boundary clamping [5, 100], and profile classification).
+
+## 5. Defensible Transparency in `airun`
 
 Every time `airun` computes a GPU Efficiency Score, the complete mathematical derivation is exposed:
 

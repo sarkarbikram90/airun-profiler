@@ -25,7 +25,10 @@ from airun.analysis.correlation import TimeWindowCorrelator
 from airun.analysis.diagnose import run_trace_diagnostic
 from airun.analysis.money_leak import compute_money_leak_report
 from airun.analysis.waste import detect_compute_waste
-from airun.benchmarks.inference import run_inference_benchmark
+from airun.benchmarks.inference import (
+    run_benchmark_from_config,
+    run_inference_benchmark,
+)
 from airun.cli.formatting import (
     build_rich_tree,
     render_agent_efficiency_panel,
@@ -628,6 +631,12 @@ def money_leak(
 
 @app.command("bench")
 def bench(
+    config: Optional[str] = typer.Option(
+        None,
+        "--config",
+        "-f",
+        help="Path to standard benchmark YAML configuration file (e.g. benchmark.yaml).",
+    ),
     model: str = typer.Option("qwen3-8b", "--model", "-m", help="Target LLM model under test."),
     engines: str = typer.Option(
         "vllm,sglang",
@@ -641,18 +650,32 @@ def bench(
     export: Optional[str] = typer.Option(
         None, "--export", "-e", help="Export path for Markdown or HTML benchmark report."
     ),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Export path for JSON results artifact (e.g. results.json)."
+    ),
+    gate_check: bool = typer.Option(
+        False, "--gate-check", help="Exit with code 1 if benchmark fails CI gate thresholds."
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output results in JSON format."),
 ) -> None:
     """Benchmark inference engines (vLLM, SGLang, TensorRT-LLM) across TTFT, TPOT, throughput, and $/1M tokens."""
-    engine_list = [e.strip() for e in engines.split(",") if e.strip()]
-    concurrency_list = [int(c.strip()) for c in concurrency.split(",") if c.strip()]
+    if config:
+        suite = run_benchmark_from_config(config)
+    else:
+        engine_list = [e.strip() for e in engines.split(",") if e.strip()]
+        concurrency_list = [int(c.strip()) for c in concurrency.split(",") if c.strip()]
+        suite = run_inference_benchmark(
+            model=model,
+            engines=engine_list,
+            gpu=gpu,
+            concurrency=concurrency_list,
+        )
 
-    suite = run_inference_benchmark(
-        model=model,
-        engines=engine_list,
-        gpu=gpu,
-        concurrency=concurrency_list,
-    )
+    if output:
+        p_out = Path(output)
+        p_out.parent.mkdir(parents=True, exist_ok=True)
+        p_out.write_text(json.dumps(suite.to_dict(), indent=2), encoding="utf-8")
+        console.print(f"[bold green][+] Benchmark JSON results written to {p_out}[/bold green]")
 
     if json_output:
         console.print(json.dumps(suite.to_dict(), indent=2))
@@ -665,6 +688,15 @@ def bench(
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(suite.to_markdown(), encoding="utf-8")
         console.print(f"[bold green][+] Benchmark report saved to {p}[/bold green]\n")
+
+    if suite.overall_gate_status == "FAIL":
+        console.print("[bold red][!] CI PERFORMANCE REGRESSION GATE FAILED:[/bold red]")
+        for e, res in suite.results_by_engine.items():
+            for f in res.gate_failures:
+                console.print(f"  - [red]{e}: {f}[/red]")
+        console.print()
+        if gate_check:
+            raise typer.Exit(code=1)
 
 
 @agent_app.command("analyze")

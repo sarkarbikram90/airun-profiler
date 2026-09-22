@@ -1,0 +1,48 @@
+# airun-bench Standard Benchmark Configuration
+# Schema version 1.0 - Deterministic LLM Serving Evaluation
+schema_version: "1.0"
+benchmark_name: "vllm-l4-serving-baseline"
+description: "Standardized vLLM serving benchmark on NVIDIA L4 measuring TTFT, decode TPOT, throughput, and hardware power"
+
+environment:
+  accelerator: "l4"
+  num_gpus: 1
+  driver_version: "550.54.15"
+  cuda_version: "12.4"
+  os: "Ubuntu 22.04 LTS"
+
+workload:
+  model: "qwen3-8b"
+  tensor_parallel_size: 1
+  input_tokens: 1024
+  output_tokens: 256
+  dataset: "sharegpt"
+  concurrency_levels: [1, 8, 32, 64]
+  num_requests: 500
+  warmup_requests: 20
+
+engines:
+  - name: "vllm"
+    version: "0.6.3"
+    args:
+      - "--enable-chunked-prefill"
+      - "--max-num-seqs=256"
+      - "--gpu-memory-utilization=0.90"
+  - name: "sglang"
+    version: "0.3.5"
+    args:
+      - "--enable-radix-cache"
+      - "--mem-fraction-static=0.88"
+
+metrics:
+  collect_dcgm: true
+  collect_power: true
+  confidence_interval_pct: 95
+  report_percentiles: [50, 90, 95, 99]
+
+gate_thresholds:
+  max_ttft_p95_ms: 160.0
+  max_ttft_p99_ms: 220.0
+  min_throughput_tokens_sec: 750.0
+  max_cost_per_1m_tokens_usd: 3.00
+  max_gpu_memory_pct: 92.0

@@ -1,0 +1,125 @@
+name: "airun PR Performance Gate"
+description: "Block AI performance regressions and GPU financial bleed in Pull Requests before deployment"
+author: "Bikram Sarkar <sarkarbikram90>"
+branding:
+  icon: "zap"
+  color: "blue"
+
+inputs:
+  config:
+    description: "Path to standard benchmark YAML configuration file (e.g. examples/benchmarks/benchmark.yaml)"
+    required: false
+    default: "examples/benchmarks/benchmark.yaml"
+  fail-on-regression:
+    description: "Whether to fail the CI step if performance regression thresholds are violated"
+    required: false
+    default: "true"
+  output-json:
+    description: "Path to write JSON benchmark results"
+    required: false
+    default: "airun-results.json"
+  github-token:
+    description: "GitHub token for posting PR comments (e.g. ${{ secrets.GITHUB_TOKEN }})"
+    required: false
+    default: ""
+
+outputs:
+  gate-status:
+    description: "Overall gate status (PASS or FAIL)"
+    value: ${{ steps.eval-gate.outputs.gate_status }}
+  ttft-p95-ms:
+    description: "Observed Time-To-First-Token p95 in ms"
+    value: ${{ steps.eval-gate.outputs.ttft_p95_ms }}
+  throughput-tps:
+    description: "Observed token throughput in tokens/sec"
+    value: ${{ steps.eval-gate.outputs.throughput_tps }}
+  cost-per-1m:
+    description: "Calculated cost per 1M tokens in USD"
+    value: ${{ steps.eval-gate.outputs.cost_per_1m }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install airun-profiler
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install airun-profiler pyyaml
+
+    - name: Run airun Benchmark Gate
+      id: eval-gate
+      shell: bash
+      run: |
+        CFG_FLAG=""
+        if [ -n "${{ inputs.config }}" ] && [ -f "${{ inputs.config }}" ]; then
+          CFG_FLAG="--config ${{ inputs.config }}"
+        fi
+
+        # Run benchmark and output to json
+        airun bench $CFG_FLAG --output "${{ inputs.output-json }}"
+
+        # Parse outputs and export summary
+        python - << 'EOF'
+        import json
+        import os
+        import sys
+
+        results_file = "${{ inputs.output-json }}"
+        if not os.path.exists(results_file):
+            print(f"::error::Results file not found: {results_file}")
+            sys.exit(1)
+
+        with open(results_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        status = data.get("overall_gate_status", "PASS")
+        results = data.get("results", {})
+        bench_name = data.get("benchmark_name", "airun-benchmark")
+        model = data.get("model", "unknown")
+        gpu = data.get("gpu", "unknown")
+
+        first_res = next(iter(results.values())) if results else {}
+        ttft_p95 = first_res.get("ttft_p95_ms", 0.0)
+        tps = first_res.get("throughput_tokens_sec", 0.0)
+        cost = first_res.get("cost_per_1m_tokens_usd", 0.0)
+
+        # Set GITHUB_OUTPUT
+        gh_output = os.getenv("GITHUB_OUTPUT")
+        if gh_output:
+            with open(gh_output, "a", encoding="utf-8") as out:
+                out.write(f"gate_status={status}\n")
+                out.write(f"ttft_p95_ms={ttft_p95}\n")
+                out.write(f"throughput_tps={tps}\n")
+                out.write(f"cost_per_1m={cost}\n")
+
+        # Render GITHUB_STEP_SUMMARY
+        gh_summary = os.getenv("GITHUB_STEP_SUMMARY")
+        if gh_summary:
+            with open(gh_summary, "a", encoding="utf-8") as s:
+                s.write(f"## 🚀 airun Performance & FinOps Gate: **{status}**\n\n")
+                s.write(f"- **Benchmark**: `{bench_name}`\n")
+                s.write(f"- **Workload**: `{model}` on `{gpu.upper()}`\n\n")
+                s.write("| Serving Engine | TTFT p50 | TTFT p95 | Throughput | $/1M Tokens | Gate Status |\n")
+                s.write("| :--- | :---: | :---: | :---: | :---: | :---: |\n")
+                for name, eng in results.items():
+                    badge = "✅ PASS" if eng.get("gate_status") == "PASS" else "❌ FAIL"
+                    s.write(f"| **{name}** | {eng.get('ttft_p50_ms', 0):.1f}ms | {eng.get('ttft_p95_ms', 0):.1f}ms | {eng.get('throughput_tokens_sec', 0):.0f} tok/s | ${eng.get('cost_per_1m_tokens_usd', 0):.2f} | {badge} |\n")
+                s.write("\n")
+                if status == "FAIL":
+                    s.write("> [!WARNING]\n")
+                    s.write("> **Performance Regression Detected**: Serving latencies or throughput violated pull request gate thresholds.\n\n")
+                    for name, eng in results.items():
+                        for fail in eng.get("gate_failures", []):
+                            s.write(f"- **{name}**: `{fail}`\n")
+
+        # Enforce exit code if fail-on-regression is true
+        fail_on_reg = "${{ inputs.fail-on-regression }}".lower() in ("true", "1", "yes")
+        if status == "FAIL" and fail_on_reg:
+            print("::error::airun PR Performance Gate FAILED. One or more engines exceeded allowable regression thresholds.")
+            sys.exit(1)
+        EOF

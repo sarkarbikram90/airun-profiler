@@ -1130,6 +1130,10 @@ def render_inference_benchmark_table(suite: Any) -> Table:
         table.add_column(e, justify="right", style=style)
 
     table.add_row("TTFT p50", *(f"{suite.results_by_engine[e].ttft_p50_ms:.1f}ms" for e in engines))
+    if any(getattr(suite.results_by_engine[e], "ttft_p95_ms", 0.0) > 0 for e in engines):
+        table.add_row(
+            "TTFT p95", *(f"{suite.results_by_engine[e].ttft_p95_ms:.1f}ms" for e in engines)
+        )
     table.add_row("TTFT p99", *(f"{suite.results_by_engine[e].ttft_p99_ms:.1f}ms" for e in engines))
     table.add_row(
         "TPOT (Decode)", *(f"{suite.results_by_engine[e].tpot_ms:.1f}ms" for e in engines)
@@ -1149,5 +1153,13 @@ def render_inference_benchmark_table(suite: Any) -> Table:
         "Energy / token",
         *(f"{suite.results_by_engine[e].energy_per_token_mj:.2f} mJ" for e in engines),
     )
+    if getattr(suite, "gate_thresholds", None):
+        table.add_row(
+            "CI Gate",
+            *(
+                f"[{'bold green' if suite.results_by_engine[e].gate_status == 'PASS' else 'bold red'}]{suite.results_by_engine[e].gate_status}[/]"
+                for e in engines
+            ),
+        )
 
     return table
